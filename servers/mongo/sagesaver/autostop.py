@@ -11,12 +11,12 @@ from config import config
 
 REGION = config["aws"]["region"]
 VPC_ID = config["aws"]["vpc-id"]
-PROJECT_NAME = config["aws"]["project"]
+STACK_NAME = config["aws"]["stack"]
 DB_CONNECTION_STRING = config["aws"]["conn-str"]
 
 TIME_LIMIT = config["autostop"]["time_limit"]
 DB_LOG_PATH = config["autostop"]["db_log"]["path"]
-DB_LOG_TIME_FORMAT = config["autostop"]["db_log"]["time_format"]
+OUTPUT_TIME_FORMAT = config["autostop"]["output"]["time_format"]
 
 def exclude_admin_collections(top_dict):
     
@@ -44,23 +44,23 @@ def new_operations(old, new):
     
     return n
 
-def notebooks_running(zone, vpc, project):
+def notebooks_running(zone, vpc, stack):
     """Count Number of notebook servers currently
-    running in a project
+    running in a stack
     
     Args:
-        region: Availability zone the project's vpc is in
-        vpc: Id of the VPC the project is hosted
-        project: The key of the project instance tag
+        region: Availability zone the stack's vpc is in
+        vpc: Id of the VPC the stack is hosted
+        stack: Name of the stack
         
     Returns:
-        Number of project notebook servers that are running
+        Number of stack notebook servers that are running
     """
     ec2 = boto3.client('ec2', zone)
     
     filters = [
         {
-            "Name": f"tag:{project}",
+            "Name": f"tag:{stack}",
             "Values": ["Notebook"]
         },
         {
@@ -110,7 +110,7 @@ def main():
     new_user_log = exclude_admin_collections(new_user_log)
     del new_user_log["note"]
     
-    print(f'[{datetime.now().strftime(DB_LOG_TIME_FORMAT)}]', end=' ')
+    print(f'[{datetime.now().strftime(OUTPUT_TIME_FORMAT)}]', end=' ')
     
     # Count number of new operations
     ops = new_operations(old_user_log, new_user_log)
@@ -137,7 +137,7 @@ def main():
         return print('Shutdown not met')
     
     # Count Notebooks running
-    count_nbs = len(notebooks_running(REGION, VPC_ID, PROJECT_NAME))
+    count_nbs = len(notebooks_running(REGION, VPC_ID, STACK_NAME))
     pred = count_nbs > 0
     print(f"NBS: {count_nbs}", end = ' ' if pred else ' | ')
     
