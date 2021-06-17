@@ -3,9 +3,10 @@ import boto3
 from botocore.exceptions import ClientError
 
 from config import config
-aws = config["aws"]
 
+aws = config["aws"]
 ec2 = boto3.client('ec2', aws["region"])
+
 try:
     ec2.start_instances(InstanceIds = [aws["db-id"]])
 except ClientError:

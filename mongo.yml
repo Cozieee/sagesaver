@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+    MongoPassword:
+        Type: String
+        Default: dsuMLppftw21
+Mappings:
+    Mongo:
+        AMI:
+            Id: ami-0147e17e2dfd91d3a
+    Template:
+        UserData:
+            OnBoot: |
+                Content-Type: multipart/mixed; boundary="//"
+                MIME-Version: 1.0
+
+                --//
+                Content-Type: text/cloud-config; charset="us-ascii"
+                MIME-Version: 1.0
+                Content-Transfer-Encoding: 7bit
+                Content-Disposition: attachment; filename="cloud-config.txt"
+
+                #cloud-config
+                cloud_final_modules:
+                - [scripts-user, always]
+
+                --//
+                Content-Type: text/x-shellscript; charset="us-ascii"
+                MIME-Version: 1.0
+                Content-Transfer-Encoding: 7bit
+                Content-Disposition: attachment; filename="userdata.txt"
+Resources:
+    MongoInstance:
+        Type: AWS::EC2::Instance
+        Properties:
+            ImageId: !FindInMap [Mongo, AMI, Id]
+            InstanceType: t2.micro
+            UserData:
+                Fn::Base64:
+                    Fn::Sub:
+                        -
+                            |
+                            ${OnBootPrefix}
+                            #!/bin/bash
+                            /opt/aws/bin/cfn-init -s ${AWS::StackName} --region ${AWS::Region} -r MongoInstance -c Boot
+                            --//
+                        - {OnBootPrefix: !FindInMap [Template, UserData, OnBoot]}
+            KeyName: sagesaver
+            Tags:
+                - Key: Name
+                  Value: Test Mongo
+                - Key: !Ref AWS::StackName
+                  Value: Mongo
+        Metadata:
+            AWS::CloudFormation::Init:
+                ServerBase:
+                    packages:
+                        yum:
+                            git: []
+                    files:
+                        /root/sagesaver/config.json:
+                            content: !Sub |
+                                {
+                                    "aws": {
+                                        "region": "${AWS::Region}",
+                                        "vpc-id": "PARAMETER",
+                                        "conn-str": "mongodb://admin:dsuMLppftw21@localhost:27017",
+                                        "stack": "${AWS::StackName}"
+                                    },
+                                    "autostop": {
+                                        "time_limit": 1800,
+                                        "db_log": {
+                                            "path": "mongo.log"
+                                        },
+                                        "output": {
+                                            "time_format": "%Y-%m-%d %H:%M:%S"
+                                        }
+                                    },
+                                    "paths": {
+                                        "sagesaver": "/root/sagesaver"
+                                    }
+                                }
+                    commands:
+                        0_SetupServerEnvironment:
+                            command: !Sub |
+                                git clone https://github.com/Cozieee/sagesaver tmp/sagesaver-gh
+                                bash tmp/sagesaver-gh/servers/mongo/env/setup.sh -p ${MongoPassword}
+                                pip3 install -r tmp/sagesaver-gh/servers/mongo/sagesaver/requirements.txt
+                                mv tmp/sagesaver-gh/servers/mongo/sagesaver .
+                                rm -rf tmp
+                            cwd: /root
+                Boot:
+                    commands:
+                        0_CheckInitialized:
+                            # TODO Switch back
+                            command: !Sub /opt/aws/bin/cfn-init -s ${AWS::StackName} --region ${AWS::Region} -r MongoInstance -c Init
+                            test: test ! -e sagesaver
+                            cwd: /root
+                        1_StartCron:
+                            command: bash mongo/startup.sh $SAGESAVER_DIR
+                            env:
+                                SAGESAVER_DIR: /root/sagesaver
+                configSets:
+                    Init:
+                        - ServerBase
+                        - InstanceConfig
+                    Boot:
+                        - Boot

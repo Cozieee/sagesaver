@@ -2,6 +2,7 @@ import os
 import re
 from datetime import datetime
 import jmespath
+
 from config import config
 
 INACTIVE_TIME_LIMIT = config["autostop"]["time_limit"]

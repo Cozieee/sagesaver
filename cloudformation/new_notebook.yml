@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+    NotebookPassword:
+        Type: String
+        Default: Qw3rty11
+Mappings:
+    Notebook:
+        AMI:
+            Id: ami-029b1a44fc988fcf4
+    Template:
+        UserData:
+            OnBoot: |
+                Content-Type: multipart/mixed; boundary="//"
+                MIME-Version: 1.0
+                --//
+                Content-Type: text/cloud-config; charset="us-ascii"
+                MIME-Version: 1.0
+                Content-Transfer-Encoding: 7bit
+                Content-Disposition: attachment; filename="cloud-config.txt"
+
+                #cloud-config
+                cloud_final_modules:
+                - [scripts-user, always]
+
+                --//
+                Content-Type: text/x-shellscript; charset="us-ascii"
+                MIME-Version: 1.0
+                Content-Transfer-Encoding: 7bit
+                Content-Disposition: attachment; filename="userdata.txt"
+Resources:
+    NotebookInstance:
+        Type: AWS::EC2::Instance
+        Properties:
+            ImageId: !FindInMap [Notebook, AMI, Id]
+            # TODO Change back to ref
+            InstanceType: t2.micro
+            UserData:
+                Fn::Base64:
+                    Fn::Sub:
+                        -
+                            |
+                            ${OnBootPrefix}
+                            #!/bin/bash
+                            /opt/aws/bin/cfn-init \
+                                --region ${AWS::Region} \
+                                -s ${AWS::StackName} \
+                                -r NotebookInstance \
+                                -c Boot
+                            --//
+                        - {OnBootPrefix: !FindInMap [Template, UserData, OnBoot]}
+            KeyName: sagesaver
+            Tags:
+                - Key: Name
+                  Value: Test Notebook
+                - Key: !Ref AWS::StackName
+                  Value: Notebook
+        Metadata:
+            # TODO Change parameters back to refs
+            AWS::CloudFormation::Init:
+            # TODO Add conda to su path
+                SageSaverInit:
+                    packages:
+                        yum:
+                            git: []
+                            amazon-efs-utils: []
+                    files:
+                        /root/sagesaver/config.json:
+                            content: !Sub |
+                                {
+                                    "aws": {
+                                        "vpc-id": "PARAMETER",
+                                        "region": "${AWS::Region}",
+                                        "db-id": "PARAMETER",
+                                        "conn-str": "mongodb://admin:PARAMETER@localhost:27017"
+                                    },
+                                    "autostop": {
+                                        "time_limit": 1800,
+                                        "jupyter_log": {
+                                            "path": "jupyter.log",
+                                            "time_format": "%Y-%m-%d %H:%M:%S"
+                                        },
+                                        "output": {
+                                            "time_format": "%Y-%m-%d %H:%M:%S"
+                                        }
+                                    },
+                                    "paths": {
+                                        "anaconda": "/root/anaconda3",
+                                        "sagesaver": "/root/sagesaver",
+                                        "jupyter": "/home/ec2-user/efs"
+                                    }
+                                }
+                    commands:
+                        0_SetupEFS:
+                        # TODO Replace efs id
+                            command: !Sub |
+                                mkdir /home/ec2-user/efs
+                                echo 'fs-2bf6ea2c:/ /home/ec2-user/efs efs defaults,_netdev 0 0' >> /etc/fstab
+                        1_SetupServerEnvironment:
+                            command: !Sub |
+                                git clone https://github.com/Cozieee/sagesaver tmp/sagesaver-gh
+                                mv tmp/sagesaver-gh/servers/notebook/sagesaver/* ./sagesaver
+                                bash sagesaver/env/setup.sh -p ${NotebookPassword}
+                                rm -rf tmp
+                            cwd: /root
+                Boot:
+                    commands:
+                        0_CheckInitialized:
+                            command: !Sub |
+                                /opt/aws/bin/cfn-init \
+                                    --region ${AWS::Region} \
+                                    -s ${AWS::StackName} \
+                                    -r NotebookInstance \
+                                    -c Init
+                            test: test ! -e sagesaver
+                            cwd: /root
+                        1_StartCron:
+                            command: bash boot.sh
+                            cwd: /root/sagesaver
+                configSets:
+                    Init:
+                        - SageSaverInit
+                    Boot:
+                        - Boot
