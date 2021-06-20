@@ -98,7 +98,7 @@ Resources:
                         1_SetupServerEnvironment:
                             command: !Sub |
                                 git clone https://github.com/Cozieee/sagesaver tmp/sagesaver-gh
-                                mv tmp/sagesaver-gh/servers/notebook/sagesaver/* ./sagesaver
+                                mv tmp/sagesaver-gh/servers/notebook/* ./sagesaver
                                 bash sagesaver/env/setup.sh -p ${NotebookPassword}
                                 rm -rf tmp
                             cwd: /root

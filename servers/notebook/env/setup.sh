@@ -30,18 +30,16 @@ do
     esac
 done
 
-#$BIN/conda install -y -c conda-forge jmespath
 python3 -m venv ../venv
 source ../venv/bin/activate
 pip3 install -r ../requirements.txt
 
-JPY_CONFIG=$ANACONDA_PATH/etc/jupyter
 JPY_SHA=$(
-python - <<-EOF
-    from IPython.lib import passwd
-    print(passwd('$JPY_PWD'))
+python3 - <<-EOF
+from IPython.lib import passwd
+print(passwd('$JPY_PWD'))
 EOF
 )
 
-render_template ./jupyter_notebook_config.py.tmpl \
-    > $JPY_CONFIG/jupyter_notebook_config.py
+render_template jupyter_notebook_config.py.tmpl \
+    > ../venv/etc/jupyter/jupyter_notebook_config.py
