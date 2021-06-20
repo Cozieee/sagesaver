@@ -11,16 +11,16 @@ do
     esac
 done
 
-source venv/bin/activate
-truncate -s 0 *.log
+source root-env/bin/activate
+truncate --no-create -s 0 *.log
 python3 db_boot.py
 
-SAGESAVER_PATH=$(pwd)
-
-screen -dm bash -c '
+sudo -u ec2-user screen -dm bash -c "
+source ~/notebook-env/bin/activate
 cd $JPY_CWD_PATH
-jupyter lab --allow-root 2>&1 | tee -a $SAGESAVER_PATH/jupyter.log
+jupyter lab 2>&1 | tee -a ~/jupyter.log
 exec sh
-'
+"
 
-echo "* * * * * cd $SAGESAVER_PATH && venv/bin/python3 autostop.py >> autostop.log 2>&1" | crontab -
+SAGESAVER_PATH=$(pwd)
+echo "* * * * * cd $SAGESAVER_PATH && root-env/bin/python3 autostop.py >> autostop.log 2>&1" | crontab -

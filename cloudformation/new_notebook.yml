@@ -79,7 +79,7 @@ Resources:
                                     "autostop": {
                                         "time_limit": 1800,
                                         "jupyter_log": {
-                                            "path": "jupyter.log",
+                                            "path": "/home/ec2-user/jupyter.log",
                                             "time_format": "%Y-%m-%d %H:%M:%S"
                                         },
                                         "output": {

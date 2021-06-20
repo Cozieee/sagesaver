@@ -24,9 +24,14 @@ do
     esac
 done
 
-python3 -m venv ../venv
-source ../venv/bin/activate
-pip3 install -r ../requirements.txt
+python3 -m venv ../root-env
+source ../root-env/bin/activate
+pip3 install -r requirements_root.txt
+deactivate
+
+su ec2-user -c "python3 -m venv /home/ec2-user/notebook-env"
+source /home/ec2-user/notebook-env/bin/activate
+pip3 install -r requirements_notebook.txt
 
 JPY_SHA=$(
 python3 - <<-EOF
@@ -36,4 +41,5 @@ EOF
 )
 
 render_template jupyter_lab_config.py.tmpl \
-    > ../venv/etc/jupyter/jupyter_lab_config.py
+    > /home/ec2-user/notebook-env/etc/jupyter/jupyter_lab_config.py
+deactivate
