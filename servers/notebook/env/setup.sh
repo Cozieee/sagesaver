@@ -1,11 +1,5 @@
-# Requirements:
-# - Anaconda3 is installed
-# - Run as root
-
 # Required: -p [Jupyter Password]
 # Optional: -h [Jupyter Port Number]
-
-# ANACONDA_PATH=${ANACONDA_PATH:-"/root/anaconda3"}
 
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
@@ -41,5 +35,5 @@ print(passwd('$JPY_PWD'))
 EOF
 )
 
-render_template jupyter_notebook_config.py.tmpl \
-    > ../venv/etc/jupyter/jupyter_notebook_config.py
+render_template jupyter_lab_config.py.tmpl \
+    > ../venv/etc/jupyter/jupyter_lab_config.py

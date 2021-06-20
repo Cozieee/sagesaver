@@ -1,12 +1,14 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Parameters:
+    Linux2AMI:
+        Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+        Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+        AllowedValues: 
+                - '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
     NotebookPassword:
         Type: String
         Default: Qw3rty11
 Mappings:
-    Notebook:
-        AMI:
-            Id: ami-029b1a44fc988fcf4
     Template:
         UserData:
             OnBoot: |
@@ -31,7 +33,7 @@ Resources:
     NotebookInstance:
         Type: AWS::EC2::Instance
         Properties:
-            ImageId: !FindInMap [Notebook, AMI, Id]
+            ImageId: !Ref Linux2AMI
             # TODO Change back to ref
             InstanceType: t2.micro
             UserData:
@@ -58,13 +60,14 @@ Resources:
             # TODO Change parameters back to refs
             AWS::CloudFormation::Init:
             # TODO Add conda to su path
-                SageSaverInit:
+                Init:
                     packages:
                         yum:
                             git: []
                             amazon-efs-utils: []
                     files:
                         /root/sagesaver/config.json:
+                            # TODO remove .jupyter_log.path and use stdin
                             content: !Sub |
                                 {
                                     "aws": {
@@ -82,11 +85,6 @@ Resources:
                                         "output": {
                                             "time_format": "%Y-%m-%d %H:%M:%S"
                                         }
-                                    },
-                                    "paths": {
-                                        "anaconda": "/root/anaconda3",
-                                        "sagesaver": "/root/sagesaver",
-                                        "jupyter": "/home/ec2-user/efs"
                                     }
                                 }
                     commands:
@@ -114,10 +112,10 @@ Resources:
                             test: test ! -e sagesaver
                             cwd: /root
                         1_StartCron:
-                            command: bash boot.sh
+                            command: bash boot.sh -j /home/ec2-user/efs
                             cwd: /root/sagesaver
                 configSets:
                     Init:
-                        - SageSaverInit
+                        - Init
                     Boot:
                         - Boot
