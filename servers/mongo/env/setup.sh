@@ -15,7 +15,10 @@ do
     esac
 done
 
-pip3 install -r --user ec2-user ../requirements.txt
+python3 -m venv ../root-env
+source ../root-env/bin/activate
+pip3 install -r requirements_root.txt
+deactivate
 
 cp ./mongodb-org-4.4.repo /etc/yum.repos.d/
 yum -y install mongodb-org
