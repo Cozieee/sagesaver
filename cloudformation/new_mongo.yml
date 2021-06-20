@@ -88,10 +88,10 @@ Resources:
                     commands:
                         0_SetupServerEnvironment:
                             command: !Sub |
-                                git clone https://github.com/Cozieee/sagesaver tmp/sagesaver-gh
-                                mv tmp/sagesaver-gh/servers/mongo/* ./sagesaver
-                                bash sagesaver/env/setup.sh -p ${MongoPassword}
-                                rm -rf tmp
+                                git clone https://github.com/Cozieee/sagesaver sagesaver-gh
+                                mv sagesaver-gh/mongo/boot/* ./sagesaver
+                                bash sagesaver-gh/mongo/env/setup.sh -p ${MongoPassword}
+                                rm -rf sagesaver-gh
                             cwd: /root
                 Boot:
                     commands:

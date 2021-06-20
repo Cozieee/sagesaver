@@ -24,8 +24,8 @@ do
     esac
 done
 
-python3 -m venv ../root-env
-source ../root-env/bin/activate
+python3 -m venv /root/sagesaver/root-env
+source /root/sagesaver/root-env/bin/activate
 pip3 install -r requirements_root.txt
 deactivate
 

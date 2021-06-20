@@ -74,7 +74,7 @@ Resources:
                                         "vpc-id": "PARAMETER",
                                         "region": "${AWS::Region}",
                                         "db-id": "PARAMETER",
-                                        "conn-str": "mongodb://admin:PARAMETER@localhost:27017"
+                                        "conn-str": "mongodb://admin:PARAMETER@PARAMETER:27017"
                                     },
                                     "autostop": {
                                         "time_limit": 1800,
@@ -92,13 +92,14 @@ Resources:
                         # TODO Replace efs id
                             command: !Sub |
                                 mkdir /home/ec2-user/efs
+                                chmod go+rw /home/ec2-user/efs
                                 echo 'fs-2bf6ea2c:/ /home/ec2-user/efs efs defaults,_netdev 0 0' >> /etc/fstab
                         1_SetupServerEnvironment:
                             command: !Sub |
-                                git clone https://github.com/Cozieee/sagesaver tmp/sagesaver-gh
-                                mv tmp/sagesaver-gh/servers/notebook/* ./sagesaver
-                                bash sagesaver/env/setup.sh -p ${NotebookPassword}
-                                rm -rf tmp
+                                git clone https://github.com/Cozieee/sagesaver sagesaver-gh
+                                mv sagesaver-gh/notebook/boot/* ./sagesaver
+                                bash sagesaver-gh/notebook/env/setup.sh -p ${NotebookPassword}
+                                rm -rf sagesaver-gh
                             cwd: /root
                 Boot:
                     commands:
