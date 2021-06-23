@@ -39,7 +39,7 @@ from IPython.lib import passwd
 print(passwd('$JPY_PWD'))
 EOF
 )
+deactivate
 
 render_template jupyter_lab_config.py.tmpl \
     > /home/ec2-user/notebook-env/etc/jupyter/jupyter_lab_config.py
-deactivate
