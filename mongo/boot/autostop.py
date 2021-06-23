@@ -44,7 +44,7 @@ def new_operations(old, new):
     
     return n
 
-def notebooks_running(zone, vpc, stack):
+def notebooks_running(zone, stack):
     """Count Number of notebook servers currently
     running in a stack
     
@@ -60,12 +60,12 @@ def notebooks_running(zone, vpc, stack):
     
     filters = [
         {
-            "Name": f"tag:{stack}",
-            "Values": ["Notebook"]
+            "Name": "tag:sagesaver:stack-origin",
+            "Values": [stack]
         },
         {
-            "Name": "vpc-id",
-            "Values": [vpc]
+            "Name": "tag:sagesaver:server-type",
+            "Values": ["Notebook"]
         },
         {
             "Name": "instance-state-name",
@@ -137,7 +137,7 @@ def main():
         return print('Shutdown not met')
     
     # Count Notebooks running
-    count_nbs = len(notebooks_running(REGION, VPC_ID, STACK_NAME))
+    count_nbs = len(notebooks_running(REGION, STACK_NAME))
     pred = count_nbs > 0
     print(f"NBS: {count_nbs}", end = ' ' if pred else ' | ')
     
