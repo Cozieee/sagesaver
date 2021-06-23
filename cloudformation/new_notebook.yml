@@ -1,13 +1,21 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Parameters:
-    Linux2AMI:
-        Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
-        Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
-        AllowedValues: 
-                - '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+    EnvironmentStack:
+        Type: String
+        Description: Name of the SageSaver environment stack this notebook will
+            be attached to.
+    NotebookName:
+        Type: String
+        Description: Name of the notebook
     NotebookPassword:
         Type: String
         Default: Qw3rty11
+    Linux2AMI:
+        Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+        Description: Don't edit this value
+        Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+        AllowedValues: 
+                - '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
 Mappings:
     Template:
         UserData:
@@ -30,12 +38,54 @@ Mappings:
                 Content-Transfer-Encoding: 7bit
                 Content-Disposition: attachment; filename="userdata.txt"
 Resources:
-    NotebookInstance:
+    NBRole:
+        Type: AWS::IAM::Role
+        Properties:
+            Description: Describe & Start access to DB
+            Policies:
+                - PolicyName: DescribeInstances
+                  PolicyDocument:
+                      Version: 2012-10-17
+                      Statement:
+                          - Effect: Allow
+                            Action: ec2:DescribeInstances
+                            Resource: "*"
+                - PolicyName: StartDB
+                  PolicyDocument:
+                      Version: 2012-10-17
+                      Statement:
+                          - Effect: Allow
+                            Action: ec2:StartInstances
+                            Resource: 
+                                Fn::Sub:
+                                    - arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${DatabaseID}
+                                    - DBID: 
+                                        Fn::ImportValue: !Sub ${EnvironmentStack}-DatabaseID
+
+            AssumeRolePolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                          Service:
+                              - ec2.amazonaws.com
+                      Action:
+                          - sts:AssumeRole
+            Path: /SageSaver/roles/
+    NBServer:
         Type: AWS::EC2::Instance
         Properties:
             ImageId: !Ref Linux2AMI
-            # TODO Change back to ref
+            # TODO Multiple Instance options
             InstanceType: t2.micro
+            IamInstanceProfile: !Ref NBRole
+            NetworkInterface:
+                - AssociatePublicIpAddress: true
+                  DeviceIndex: 0
+                  GroupSet:
+                    - Fn::ImportValue: !Sub ${EnvironmentStack}-NotebookGroupID
+                  SubnetId: 
+                    Fn::ImportValue: !Sub ${EnvironmentStack}-PublicSubnetID
             UserData:
                 Fn::Base64:
                     Fn::Sub:
@@ -49,17 +99,17 @@ Resources:
                                 -r NotebookInstance \
                                 -c Boot
                             --//
-                        - {OnBootPrefix: !FindInMap [Template, UserData, OnBoot]}
+                        - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
             KeyName: sagesaver
             Tags:
                 - Key: Name
-                  Value: Test Notebook
-                - Key: !Ref AWS::StackName
+                  Value: !Sub AWS::StackName
+                - Key: sagesaver:stack-origin
+                  Value: !Ref NotebookName
+                - Key: sagesaver:server-type
                   Value: Notebook
         Metadata:
-            # TODO Change parameters back to refs
             AWS::CloudFormation::Init:
-            # TODO Add conda to su path
                 Init:
                     packages:
                         yum:
@@ -67,33 +117,32 @@ Resources:
                             amazon-efs-utils: []
                     files:
                         /root/sagesaver/config.json:
-                            # TODO remove .jupyter_log.path and use stdin
-                            content: !Sub |
-                                {
-                                    "aws": {
-                                        "vpc-id": "PARAMETER",
-                                        "region": "${AWS::Region}",
-                                        "db-id": "PARAMETER",
-                                        "conn-str": "mongodb://admin:PARAMETER@PARAMETER:27017"
-                                    },
-                                    "autostop": {
-                                        "time_limit": 1800,
-                                        "jupyter_log": {
-                                            "path": "/home/ec2-user/jupyter.log",
-                                            "time_format": "%Y-%m-%d %H:%M:%S"
-                                        },
-                                        "output": {
-                                            "time_format": "%Y-%m-%d %H:%M:%S"
+                            content: 
+                                Fn::Sub:
+                                    - |
+                                        {
+                                            "aws": {
+                                                "region": "${AWS::Region}",
+                                                "db-id": "${DatabaseID}",
+                                            },
+                                            "autostop": {
+                                                "time_limit": 1800,
+                                                "jupyter_log": {
+                                                    "path": "/home/ec2-user/jupyter.log",
+                                                    "time_format": "%Y-%m-%d %H:%M:%S"
+                                                },
+                                                "output": {
+                                                    "time_format": "%Y-%m-%d %H:%M:%S"
+                                                }
+                                            }
                                         }
-                                    }
-                                }
+                                    - DatabaseID:
+                                        Fn::ImportValue: !Sub ${EnvironmentStack}-DatabaseID
                     commands:
-                        0_SetupEFS:
-                        # TODO Replace efs id
-                            command: !Sub |
+                        0_SetupEFSDir:
+                            command:
                                 mkdir /home/ec2-user/efs
                                 chmod go+rw /home/ec2-user/efs
-                                echo 'fs-2bf6ea2c:/ /home/ec2-user/efs efs defaults,_netdev 0 0' >> /etc/fstab
                         1_SetupServerEnvironment:
                             command: !Sub |
                                 git clone https://github.com/Cozieee/sagesaver sagesaver-gh
@@ -101,6 +150,18 @@ Resources:
                                 bash sagesaver-gh/notebook/env/setup.sh -p ${NotebookPassword}
                                 rm -rf sagesaver-gh
                             cwd: /root
+                EFSBoilerPlate:
+                    files:
+                        /home/ec2-user/.env:
+                            content: !Sub |
+                                ENV_STACK_NAME="${EnvironmentStack}"
+                    command:
+                        0_LoadBoilerPlate:
+                            command:
+                                git clone https://github.com/Cozieee/sagesaver sagesaver-gh
+                                mv sagesaver-gh/notebook/efs/* efs/
+                                rm -rf sagesaver-gh
+                            cwd: /home/ec2-user
                 Boot:
                     commands:
                         0_CheckInitialized:
@@ -112,7 +173,22 @@ Resources:
                                     -c Init
                             test: test ! -e sagesaver
                             cwd: /root
-                        1_StartCron:
+                        1_MountEFS:
+                            command:
+                                Fn::Sub:
+                                    - mount -t efs ${EFSID} /home/ec2-user/efs
+                                    - EFSID:
+                                        Fn::ImportValue: !Sub ${EnvironmentStack}-EFSID
+                        2_CheckEFSNotEmpty:
+                            command: !Sub |
+                                /opt/aws/bin/cfn-init \
+                                    --region ${AWS::Region} \
+                                    -s ${AWS::StackName} \
+                                    -r NotebookInstance \
+                                    -c EFSBoilerPlate
+                            test: test -z "$(ls -A efs)"
+                            cwd: /home/ec2-user
+                        3_StartCron:
                             command: bash boot.sh -j /home/ec2-user/efs
                             cwd: /root/sagesaver
                 configSets:

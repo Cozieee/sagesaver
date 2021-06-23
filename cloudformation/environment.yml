@@ -1,0 +1,374 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  A sagemaker-studio-like jupyter environment made for AWS new-comers.
+  Comes pre-bundled with a database (Mongo/MySQL), cost-saving measures like
+  automatic inactivity  detection (adjustable), opt-in shared notebook 
+  repository (EFS), and fast environment & notebook launch speeds.
+Resources:
+  # ENVIRONMENT
+  VPC1:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.31.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} General
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: bfd0d0d5-d166-4dce-aa83-170b70858c79
+  Net1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 172.31.0.0/24
+      VpcId: !Ref VPC1
+      AvailabilityZone: !Select 
+        - 0
+        - Fn::GetAZs: !Ref AWS::Region
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Public
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: b48a2777-cf1e-48d7-9859-45210d4e89ed
+  # ROUTES
+  IGW1:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} General
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 5ef05761-700a-446a-b034-123395f54960
+  RTB1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC1
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Public
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: d8a6ead3-b341-4a2c-9d56-717a6b69a024
+  IGW1ToVPC1:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC1
+      InternetGatewayId: !Ref IGW1
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 7666742b-970a-4b30-8f60-4448650c4e96
+  RTBToSubnet:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Net1
+      RouteTableId: !Ref RTB1
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: f1e2009c-1e3a-43a6-9042-47613659ff47
+  Route1:
+    Type: AWS::EC2::Route
+    DependsOn: IGW1ToVPC1
+    Properties:
+      RouteTableId: !Ref RTB1
+      GatewayId: !Ref IGW1
+      DestinationCidrBlock: 0.0.0.0/0
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: f51038b0-ed80-41a7-a4a2-e975e1c9205c
+  Route2:
+    Type: AWS::EC2::Route
+    DependsOn: IGW1ToVPC1
+    Properties:
+      RouteTableId: !Ref RTB1
+      GatewayId: !Ref IGW1
+      DestinationIpv6CidrBlock: ::/0
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 36f8f644-9dd7-4079-8667-948c9b795170
+  # SECURITY
+  NotebookGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName} Notebook
+      GroupDescription: Access to notebooks via SSH
+      VpcId: !Ref VPC1
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 0f831c84-cc12-44ef-84df-85f2137aea6c
+  MongoGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName} Mongo
+      GroupDescription: Access to mongo via SSH or Notebooks
+      VpcId: !Ref VPC1
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: fc661c1f-492f-4f45-b754-39c233247e10
+  EFSGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${AWS::StackName} EFS
+      GroupDescription: Access to EFS via Mongo & Notebook
+      VpcId: !Ref VPC1
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 4342fd1f-a1ab-4991-b80e-77569a96dab9
+  NotebookToMongo:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref MongoGroup
+      SourceSecurityGroupId: !Ref NotebookGroup
+      IpProtocol: tcp
+      FromPort: 27017
+      ToPort: 27017
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 2a7e0901-1d1f-4780-a89b-02902bac855a
+  NotebookToEFS:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EFSGroup
+      SourceSecurityGroupId: !Ref NotebookGroup
+      IpProtocol: tcp
+      FromPort: 2049
+      ToPort: 2049
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: d8a3eb5e-2c62-41a5-bbce-fdea9aca8ad7
+  # EFS
+  EFS1:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      AvailabilityZoneName: !GetAtt Net1.AvailabilityZone
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Repo
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 2f163848-9b92-471e-bbe1-4421bb36bc78
+  EFS1ToNet1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS1
+      SubnetId: !Ref Net1
+      SecurityGroups:
+        - !Ref EFSGroup
+    Metadata:
+      AWS::CloudFormation::Designer:
+        id: 49fe75eb-742e-49a9-a81b-9aefe4550116
+  # EC2
+Outputs:
+  VPCID:
+    Description: ID of the environment's general VPC
+    Value: !Ref VPC1
+    Export:
+      Name: !Sub ${AWS::StackName}-VPCID
+  NotebookGroupID:
+    Description: ID of the shared notebook security group
+    Value: !Ref NotebookGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-NotebookGroupID
+  PublicSubnetID:
+    Description: ID of the environment's public subnet
+    Value: !Ref Net1
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnetID
+  DatabaseID:
+    Description: ID of the environment's ec2 database
+    Value: !Ref DBServer
+    Export:
+      Name: !Sub ${AWS::StackName}-DatabaseID
+  EFSID:
+    Description: ID of the environment's shared EFS repo
+    Value: !Ref VPC1
+    Export:
+      Name: !Sub ${AWS::StackName}-EFSID
+Metadata:
+  AWS::CloudFormation::Designer:
+    5ef05761-700a-446a-b034-123395f54960:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 180
+        y: 680
+      z: 1
+      embeds: []
+    bfd0d0d5-d166-4dce-aa83-170b70858c79:
+      size:
+        width: 780
+        height: 540
+      position:
+        x: 100
+        y: 120
+      z: 1
+      embeds:
+        - 4342fd1f-a1ab-4991-b80e-77569a96dab9
+        - fc661c1f-492f-4f45-b754-39c233247e10
+        - 0f831c84-cc12-44ef-84df-85f2137aea6c
+        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+        - b48a2777-cf1e-48d7-9859-45210d4e89ed
+    d8a6ead3-b341-4a2c-9d56-717a6b69a024:
+      size:
+        width: 260
+        height: 340
+      position:
+        x: 130
+        y: 150
+      z: 2
+      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+      embeds:
+        - 36f8f644-9dd7-4079-8667-948c9b795170
+        - f51038b0-ed80-41a7-a4a2-e975e1c9205c
+      iscontainedinside:
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+    7666742b-970a-4b30-8f60-4448650c4e96:
+      source:
+        id: bfd0d0d5-d166-4dce-aa83-170b70858c79
+      target:
+        id: 5ef05761-700a-446a-b034-123395f54960
+      z: 1
+    36f8f644-9dd7-4079-8667-948c9b795170:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 220
+        y: 390
+      z: 3
+      parent: d8a6ead3-b341-4a2c-9d56-717a6b69a024
+      embeds: []
+      isassociatedwith:
+        - 5ef05761-700a-446a-b034-123395f54960
+      iscontainedinside:
+        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+      dependson:
+        - 7666742b-970a-4b30-8f60-4448650c4e96
+    f51038b0-ed80-41a7-a4a2-e975e1c9205c:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 220
+        y: 280
+      z: 3
+      parent: d8a6ead3-b341-4a2c-9d56-717a6b69a024
+      embeds: []
+      isassociatedwith:
+        - 5ef05761-700a-446a-b034-123395f54960
+      iscontainedinside:
+        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+      dependson:
+        - 7666742b-970a-4b30-8f60-4448650c4e96
+    4342fd1f-a1ab-4991-b80e-77569a96dab9:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 460
+        y: 510
+      z: 2
+      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+      embeds: []
+      iscontainedinside:
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+    fc661c1f-492f-4f45-b754-39c233247e10:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 660
+        y: 460
+      z: 2
+      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+      embeds: []
+      iscontainedinside:
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+    0f831c84-cc12-44ef-84df-85f2137aea6c:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 660
+        y: 560
+      z: 2
+      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+      embeds: []
+      iscontainedinside:
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+    b48a2777-cf1e-48d7-9859-45210d4e89ed:
+      size:
+        width: 240
+        height: 240
+      position:
+        x: 430
+        y: 150
+      z: 2
+      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+      embeds:
+        - 49fe75eb-742e-49a9-a81b-9aefe4550116
+      iscontainedinside:
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        - bfd0d0d5-d166-4dce-aa83-170b70858c79
+    2f163848-9b92-471e-bbe1-4421bb36bc78:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 560
+        y: 680
+      z: 1
+      embeds: []
+    49fe75eb-742e-49a9-a81b-9aefe4550116:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 460
+        y: 210
+      z: 3
+      parent: b48a2777-cf1e-48d7-9859-45210d4e89ed
+      embeds: []
+      isassociatedwith:
+        - 2f163848-9b92-471e-bbe1-4421bb36bc78
+        - 4342fd1f-a1ab-4991-b80e-77569a96dab9
+      iscontainedinside:
+        - b48a2777-cf1e-48d7-9859-45210d4e89ed
+        - b48a2777-cf1e-48d7-9859-45210d4e89ed
+    f1e2009c-1e3a-43a6-9042-47613659ff47:
+      source:
+        id: d8a6ead3-b341-4a2c-9d56-717a6b69a024
+      target:
+        id: b48a2777-cf1e-48d7-9859-45210d4e89ed
+      z: 2
+    d8a3eb5e-2c62-41a5-bbce-fdea9aca8ad7:
+      source:
+        id: 0f831c84-cc12-44ef-84df-85f2137aea6c
+      target:
+        id: 4342fd1f-a1ab-4991-b80e-77569a96dab9
+      z: 2
+    2a7e0901-1d1f-4780-a89b-02902bac855a:
+      source:
+        id: 0f831c84-cc12-44ef-84df-85f2137aea6c
+      target:
+        id: fc661c1f-492f-4f45-b754-39c233247e10
+      z: 2

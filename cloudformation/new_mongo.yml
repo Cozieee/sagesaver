@@ -35,6 +35,7 @@ Resources:
         Type: AWS::EC2::Instance
         Properties:
             ImageId: !Ref Linux2AMI
+            # TODO Provide parameter
             InstanceType: t2.micro
             UserData:
                 Fn::Base64:
@@ -49,7 +50,7 @@ Resources:
                                 -r MongoInstance \
                                 -c Boot
                             --//
-                        - {OnBootPrefix: !FindInMap [Template, UserData, OnBoot]}
+                        - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
             KeyName: sagesaver
             Tags:
                 - Key: Name
@@ -68,7 +69,6 @@ Resources:
                                 {
                                     "aws": {
                                         "region": "${AWS::Region}",
-                                        "vpc-id": "PARAMETER",
                                         "conn-str": "mongodb://admin:${MongoPassword}@localhost:27017",
                                         "stack": "${AWS::StackName}"
                                     },
