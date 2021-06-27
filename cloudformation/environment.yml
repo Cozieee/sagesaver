@@ -1,374 +1,849 @@
+# [✓] Include username param in setup.sh
+# [✓] Provide EBS size options & Inactivity Period & Port option?
+# [✓] Update Designer
+# [✓] Use mappings for switch statements
+# [✓] Secrets Manager
+# [✓] Use secret for connection to database
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
-  A sagemaker-studio-like jupyter environment made for AWS new-comers.
-  Comes pre-bundled with a database (Mongo/MySQL), cost-saving measures like
-  automatic inactivity  detection (adjustable), opt-in shared notebook 
-  repository (EFS), and fast environment & notebook launch speeds.
-Resources:
-  # ENVIRONMENT
-  VPC1:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: 172.31.0.0/16
-      EnableDnsHostnames: true
-      EnableDnsSupport: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName} General
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: bfd0d0d5-d166-4dce-aa83-170b70858c79
-  Net1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      CidrBlock: 172.31.0.0/24
-      VpcId: !Ref VPC1
-      AvailabilityZone: !Select 
-        - 0
-        - Fn::GetAZs: !Ref AWS::Region
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName} Public
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: b48a2777-cf1e-48d7-9859-45210d4e89ed
-  # ROUTES
-  IGW1:
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName} General
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: 5ef05761-700a-446a-b034-123395f54960
-  RTB1:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC1
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName} Public
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: d8a6ead3-b341-4a2c-9d56-717a6b69a024
-  IGW1ToVPC1:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref VPC1
-      InternetGatewayId: !Ref IGW1
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: 7666742b-970a-4b30-8f60-4448650c4e96
-  RTBToSubnet:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref Net1
-      RouteTableId: !Ref RTB1
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: f1e2009c-1e3a-43a6-9042-47613659ff47
-  Route1:
-    Type: AWS::EC2::Route
-    DependsOn: IGW1ToVPC1
-    Properties:
-      RouteTableId: !Ref RTB1
-      GatewayId: !Ref IGW1
-      DestinationCidrBlock: 0.0.0.0/0
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: f51038b0-ed80-41a7-a4a2-e975e1c9205c
-  Route2:
-    Type: AWS::EC2::Route
-    DependsOn: IGW1ToVPC1
-    Properties:
-      RouteTableId: !Ref RTB1
-      GatewayId: !Ref IGW1
-      DestinationIpv6CidrBlock: ::/0
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: 36f8f644-9dd7-4079-8667-948c9b795170
-  # SECURITY
-  NotebookGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub ${AWS::StackName} Notebook
-      GroupDescription: Access to notebooks via SSH
-      VpcId: !Ref VPC1
-      SecurityGroupIngress:
-        - CidrIp: 0.0.0.0/0
-          IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: 0f831c84-cc12-44ef-84df-85f2137aea6c
-  MongoGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub ${AWS::StackName} Mongo
-      GroupDescription: Access to mongo via SSH or Notebooks
-      VpcId: !Ref VPC1
-      SecurityGroupIngress:
-        - CidrIp: 0.0.0.0/0
-          IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: fc661c1f-492f-4f45-b754-39c233247e10
-  EFSGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub ${AWS::StackName} EFS
-      GroupDescription: Access to EFS via Mongo & Notebook
-      VpcId: !Ref VPC1
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: 4342fd1f-a1ab-4991-b80e-77569a96dab9
-  NotebookToMongo:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref MongoGroup
-      SourceSecurityGroupId: !Ref NotebookGroup
-      IpProtocol: tcp
-      FromPort: 27017
-      ToPort: 27017
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: 2a7e0901-1d1f-4780-a89b-02902bac855a
-  NotebookToEFS:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref EFSGroup
-      SourceSecurityGroupId: !Ref NotebookGroup
-      IpProtocol: tcp
-      FromPort: 2049
-      ToPort: 2049
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: d8a3eb5e-2c62-41a5-bbce-fdea9aca8ad7
-  # EFS
-  EFS1:
-    Type: AWS::EFS::FileSystem
-    Properties:
-      AvailabilityZoneName: !GetAtt Net1.AvailabilityZone
-      FileSystemTags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName} Repo
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: 2f163848-9b92-471e-bbe1-4421bb36bc78
-  EFS1ToNet1:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EFS1
-      SubnetId: !Ref Net1
-      SecurityGroups:
-        - !Ref EFSGroup
-    Metadata:
-      AWS::CloudFormation::Designer:
-        id: 49fe75eb-742e-49a9-a81b-9aefe4550116
-  # EC2
-Outputs:
-  VPCID:
-    Description: ID of the environment's general VPC
-    Value: !Ref VPC1
-    Export:
-      Name: !Sub ${AWS::StackName}-VPCID
-  NotebookGroupID:
-    Description: ID of the shared notebook security group
-    Value: !Ref NotebookGroup
-    Export:
-      Name: !Sub ${AWS::StackName}-NotebookGroupID
-  PublicSubnetID:
-    Description: ID of the environment's public subnet
-    Value: !Ref Net1
-    Export:
-      Name: !Sub ${AWS::StackName}-PublicSubnetID
-  DatabaseID:
-    Description: ID of the environment's ec2 database
-    Value: !Ref DBServer
-    Export:
-      Name: !Sub ${AWS::StackName}-DatabaseID
-  EFSID:
-    Description: ID of the environment's shared EFS repo
-    Value: !Ref VPC1
-    Export:
-      Name: !Sub ${AWS::StackName}-EFSID
+    A secure, sagemaker-studio-like jupyter environment made for AWS new-comers.
+    Comes pre-bundled with a database (Mongo/MySQL), cost-saving measures like
+    automatic inactivity  detection (adjustable), optional shared notebook 
+    repository (EFS), and fast environment & notebook launch speeds.
+Parameters:
+    DBType:
+        Type: String
+        Description: Type of database to host
+        Default: Mongo
+        AllowedValues:
+            - Mongo
+            - Mysql
+    DBInstanceType:
+        Type: String
+        Description:
+            "Type of EC2 instance to launch. Recommended - Micro: testing |
+            T3: Small-scale, volatile r/w | M5: Mid-Scale | R5: Large-Scale"
+        Default: r5.large
+        AllowedValues:
+            - t2.micro
+            - t3.micro
+            - t3.small
+            - t3.medium
+            - t3.large
+            - t3.xlarge
+            - t3.2xlarge
+            - m5.large
+            - m5.xlarge
+            - m5.2xlarge
+            - m5.4xlarge
+            - m5.8xlarge
+            - r5.large
+            - r5.xlarge
+            - r5.2xlarge
+            - r5.4xlarge
+            - r5.8xlarge
+    DBKeyPair:
+        Type: AWS::EC2::KeyPair::KeyName
+        Description: Keypair used to ssh into database
+        AllowedPattern: .+
+        ConstraintDescription: is required
+    DBUsername:
+        Type: String
+        Description: Username used to connect to database
+        Default: Admin
+        MinLength: 1
+        MaxLength: 40
+        AllowedPattern: ^[a-zA-Z0-9]*$
+        ConstraintDescription: has invalid length or characters
+    DBPassword:
+        Type: String
+        Description: Password used to connect to database
+        Default: dsuMLppftw21
+        MinLength: 8
+        MaxLength: 40
+        AllowedPattern: ^[a-zA-Z0-9]*$
+        ConstraintDescription: has invalid length or characters
+        NoEcho: true
+    DBSize:
+        Type: Number
+        Description: Size of the database (GB)
+        Default: 20
+        MinValue: 1
+        ConstraintDescription: must be at least 1 GB
+    DBInactiveLimit:
+        Type: Number
+        Description: Minutes database can be inactive (no queries) before shutting down
+        Default: 30
+        MinValue: 5
+        MaxValue: 1440
+    JournalSize:
+        Type: Number
+        Description: Size (GB) of EBS volume reserved for Mongo journal. 20% of data size is suggested.
+        Default: 4
+        MinValue: 1
+        ConstraintDescription: must be at least 1 GB
+    LogSize:
+        Type: Number
+        Description: Size (GB) of EBS volume reserved for Mongo Log. 10% of data size is suggested.
+        Default: 2
+        MinValue: 1
+        ConstraintDescription: must be at least 1 GB
+    Linux2AMI:
+        Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+        Description: Image used for instances
+        Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+        ConstraintDescription: cannot be changed
+Conditions:
+    IsMongo: !Equals [!Ref DBType, Mongo]
+    IsMysql: !Equals [!Ref DBType, Mysql]
 Metadata:
-  AWS::CloudFormation::Designer:
-    5ef05761-700a-446a-b034-123395f54960:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 180
-        y: 680
-      z: 1
-      embeds: []
-    bfd0d0d5-d166-4dce-aa83-170b70858c79:
-      size:
-        width: 780
-        height: 540
-      position:
-        x: 100
-        y: 120
-      z: 1
-      embeds:
-        - 4342fd1f-a1ab-4991-b80e-77569a96dab9
-        - fc661c1f-492f-4f45-b754-39c233247e10
-        - 0f831c84-cc12-44ef-84df-85f2137aea6c
-        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
-        - b48a2777-cf1e-48d7-9859-45210d4e89ed
-    d8a6ead3-b341-4a2c-9d56-717a6b69a024:
-      size:
-        width: 260
-        height: 340
-      position:
-        x: 130
-        y: 150
-      z: 2
-      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
-      embeds:
-        - 36f8f644-9dd7-4079-8667-948c9b795170
-        - f51038b0-ed80-41a7-a4a2-e975e1c9205c
-      iscontainedinside:
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-    7666742b-970a-4b30-8f60-4448650c4e96:
-      source:
-        id: bfd0d0d5-d166-4dce-aa83-170b70858c79
-      target:
-        id: 5ef05761-700a-446a-b034-123395f54960
-      z: 1
-    36f8f644-9dd7-4079-8667-948c9b795170:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 220
-        y: 390
-      z: 3
-      parent: d8a6ead3-b341-4a2c-9d56-717a6b69a024
-      embeds: []
-      isassociatedwith:
-        - 5ef05761-700a-446a-b034-123395f54960
-      iscontainedinside:
-        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
-        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
-      dependson:
-        - 7666742b-970a-4b30-8f60-4448650c4e96
-    f51038b0-ed80-41a7-a4a2-e975e1c9205c:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 220
-        y: 280
-      z: 3
-      parent: d8a6ead3-b341-4a2c-9d56-717a6b69a024
-      embeds: []
-      isassociatedwith:
-        - 5ef05761-700a-446a-b034-123395f54960
-      iscontainedinside:
-        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
-        - d8a6ead3-b341-4a2c-9d56-717a6b69a024
-      dependson:
-        - 7666742b-970a-4b30-8f60-4448650c4e96
-    4342fd1f-a1ab-4991-b80e-77569a96dab9:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 460
-        y: 510
-      z: 2
-      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
-      embeds: []
-      iscontainedinside:
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-    fc661c1f-492f-4f45-b754-39c233247e10:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 660
-        y: 460
-      z: 2
-      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
-      embeds: []
-      iscontainedinside:
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-    0f831c84-cc12-44ef-84df-85f2137aea6c:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 660
-        y: 560
-      z: 2
-      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
-      embeds: []
-      iscontainedinside:
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-    b48a2777-cf1e-48d7-9859-45210d4e89ed:
-      size:
-        width: 240
-        height: 240
-      position:
-        x: 430
-        y: 150
-      z: 2
-      parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
-      embeds:
-        - 49fe75eb-742e-49a9-a81b-9aefe4550116
-      iscontainedinside:
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-        - bfd0d0d5-d166-4dce-aa83-170b70858c79
-    2f163848-9b92-471e-bbe1-4421bb36bc78:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 560
-        y: 680
-      z: 1
-      embeds: []
-    49fe75eb-742e-49a9-a81b-9aefe4550116:
-      size:
-        width: 60
-        height: 60
-      position:
-        x: 460
-        y: 210
-      z: 3
-      parent: b48a2777-cf1e-48d7-9859-45210d4e89ed
-      embeds: []
-      isassociatedwith:
-        - 2f163848-9b92-471e-bbe1-4421bb36bc78
-        - 4342fd1f-a1ab-4991-b80e-77569a96dab9
-      iscontainedinside:
-        - b48a2777-cf1e-48d7-9859-45210d4e89ed
-        - b48a2777-cf1e-48d7-9859-45210d4e89ed
-    f1e2009c-1e3a-43a6-9042-47613659ff47:
-      source:
-        id: d8a6ead3-b341-4a2c-9d56-717a6b69a024
-      target:
-        id: b48a2777-cf1e-48d7-9859-45210d4e89ed
-      z: 2
-    d8a3eb5e-2c62-41a5-bbce-fdea9aca8ad7:
-      source:
-        id: 0f831c84-cc12-44ef-84df-85f2137aea6c
-      target:
-        id: 4342fd1f-a1ab-4991-b80e-77569a96dab9
-      z: 2
-    2a7e0901-1d1f-4780-a89b-02902bac855a:
-      source:
-        id: 0f831c84-cc12-44ef-84df-85f2137aea6c
-      target:
-        id: fc661c1f-492f-4f45-b754-39c233247e10
-      z: 2
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+            - Label:
+                  default: Database
+              Parameters:
+                  - DBType
+                  - DBInstanceType
+                  - DBKeyPair
+                  - DBUsername
+                  - DBPassword
+                  - DBSize
+                  - DBInactiveLimit
+            - Label:
+                  default: MongoDB [IF SELECTED]
+              Parameters:
+                  - JournalSize
+                  - LogSize
+            - Label:
+                  default: Enforced Configurations [DO NOT CHANGE]
+              Parameters:
+                  - Linux2AMI
+        ParameterLabels:
+            DBType:
+                default: DMS Type
+            DBInstanceType:
+                default: EC2 Instance Type
+            DBUsername:
+                default: Username
+            DBPassword:
+                default: Password
+            DBKeyPair:
+                default: EC2 Key Pair
+            DBSize: 
+                default: Storage Size
+            DBInactiveLimit:
+                default: Inactive Time Limit
+            JournalSize:
+                default: Journal Size
+            LogSize:
+                default: Log Size
+            Linux2AMI:
+                default: EC2 Instance Base AMI
+    AWS::CloudFormation::Designer:
+        5ef05761-700a-446a-b034-123395f54960:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 260
+                "y": 670
+            z: 1
+            embeds: []
+        bfd0d0d5-d166-4dce-aa83-170b70858c79:
+            size:
+                width: 410
+                height: 490
+            position:
+                x: 90
+                "y": 170
+            z: 1
+            embeds:
+                - 4342fd1f-a1ab-4991-b80e-77569a96dab9
+                - fc661c1f-492f-4f45-b754-39c233247e10
+                - 0f831c84-cc12-44ef-84df-85f2137aea6c
+                - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+                - b48a2777-cf1e-48d7-9859-45210d4e89ed
+        d8a6ead3-b341-4a2c-9d56-717a6b69a024:
+            size:
+                width: 310
+                height: 150
+            position:
+                x: 140
+                "y": 470
+            z: 2
+            parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+            embeds:
+                - 36f8f644-9dd7-4079-8667-948c9b795170
+                - f51038b0-ed80-41a7-a4a2-e975e1c9205c
+            iscontainedinside:
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        7666742b-970a-4b30-8f60-4448650c4e96:
+            source:
+                id: bfd0d0d5-d166-4dce-aa83-170b70858c79
+            target:
+                id: 5ef05761-700a-446a-b034-123395f54960
+            z: 1
+        36f8f644-9dd7-4079-8667-948c9b795170:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 330
+                "y": 500
+            z: 3
+            parent: d8a6ead3-b341-4a2c-9d56-717a6b69a024
+            embeds: []
+            isassociatedwith:
+                - 5ef05761-700a-446a-b034-123395f54960
+            iscontainedinside:
+                - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+                - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+                - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+            dependson:
+                - 7666742b-970a-4b30-8f60-4448650c4e96
+        f51038b0-ed80-41a7-a4a2-e975e1c9205c:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 190
+                "y": 500
+            z: 3
+            parent: d8a6ead3-b341-4a2c-9d56-717a6b69a024
+            embeds: []
+            isassociatedwith:
+                - 5ef05761-700a-446a-b034-123395f54960
+            iscontainedinside:
+                - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+                - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+                - d8a6ead3-b341-4a2c-9d56-717a6b69a024
+            dependson:
+                - 7666742b-970a-4b30-8f60-4448650c4e96
+        4342fd1f-a1ab-4991-b80e-77569a96dab9:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 370
+                "y": 370
+            z: 2
+            parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+            embeds: []
+            iscontainedinside:
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        fc661c1f-492f-4f45-b754-39c233247e10:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 160
+                "y": 370
+            z: 2
+            parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+            embeds: []
+            iscontainedinside:
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        0f831c84-cc12-44ef-84df-85f2137aea6c:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 270
+                "y": 370
+            z: 2
+            parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+            embeds: []
+            iscontainedinside:
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        b48a2777-cf1e-48d7-9859-45210d4e89ed:
+            size:
+                width: 350
+                height: 130
+            position:
+                x: 120
+                "y": 200
+            z: 2
+            parent: bfd0d0d5-d166-4dce-aa83-170b70858c79
+            embeds:
+                - 49fe75eb-742e-49a9-a81b-9aefe4550116
+                - 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e
+            iscontainedinside:
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+                - bfd0d0d5-d166-4dce-aa83-170b70858c79
+        2f163848-9b92-471e-bbe1-4421bb36bc78:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 370
+                "y": 90
+            z: 1
+            embeds: []
+        49fe75eb-742e-49a9-a81b-9aefe4550116:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 370
+                "y": 240
+            z: 3
+            parent: b48a2777-cf1e-48d7-9859-45210d4e89ed
+            embeds: []
+            isassociatedwith:
+                - 2f163848-9b92-471e-bbe1-4421bb36bc78
+                - 4342fd1f-a1ab-4991-b80e-77569a96dab9
+            iscontainedinside:
+                - b48a2777-cf1e-48d7-9859-45210d4e89ed
+                - b48a2777-cf1e-48d7-9859-45210d4e89ed
+                - b48a2777-cf1e-48d7-9859-45210d4e89ed
+        f1e2009c-1e3a-43a6-9042-47613659ff47:
+            source:
+                id: d8a6ead3-b341-4a2c-9d56-717a6b69a024
+            target:
+                id: b48a2777-cf1e-48d7-9859-45210d4e89ed
+            z: 2
+        d8a3eb5e-2c62-41a5-bbce-fdea9aca8ad7:
+            source:
+                id: 0f831c84-cc12-44ef-84df-85f2137aea6c
+            target:
+                id: 4342fd1f-a1ab-4991-b80e-77569a96dab9
+            z: 2
+        2a7e0901-1d1f-4780-a89b-02902bac855a:
+            source:
+                id: 0f831c84-cc12-44ef-84df-85f2137aea6c
+            target:
+                id: fc661c1f-492f-4f45-b754-39c233247e10
+            z: 2
+        c8e3670a-6632-4a61-8f87-ec46c1ae3a10:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 250
+                "y": 90
+            z: 1
+            embeds: []
+        16c011d9-b6a4-43e7-9275-aaf4d596602d:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 250
+                "y": -10
+            z: 1
+            embeds: []
+            isassociatedwith:
+                - c8e3670a-6632-4a61-8f87-ec46c1ae3a10
+        189edcaf-48fc-4953-8709-3f5afbd706f5:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 160
+                "y": 90
+            z: 1
+            embeds: []
+        73f4494b-b0c8-4f50-8bab-c604d1ec2a8e:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 160
+                "y": 240
+            z: 3
+            parent: b48a2777-cf1e-48d7-9859-45210d4e89ed
+            embeds: []
+            iscontainedinside:
+                - b48a2777-cf1e-48d7-9859-45210d4e89ed
+        bb502e68-dac5-4d6a-8387-058944e3fc85:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 10
+                "y": 240
+            z: 1
+            embeds: []
+        49d265a5-8814-4542-9208-8d4e4092568d:
+            size:
+                width: 60
+                height: 60
+            position:
+                x: 160
+                "y": -10
+            z: 1
+            embeds: []
+            isassociatedwith:
+                - 189edcaf-48fc-4953-8709-3f5afbd706f5
+        f39b15f9-7a69-49d5-87bd-6f3a5ef0d06c:
+            source:
+                id: 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e
+                selector: "g:nth-child(1) g:nth-child(4) g:nth-child(10) circle:nth-child(1)     "
+                port: "AWS::ContainedInsideLink-AWS::EC2::Subnet-SubnetId"
+            target:
+                id: b48a2777-cf1e-48d7-9859-45210d4e89ed
+            z: 12
+        27118d03-b1ab-4c21-bf56-8dad43ec952c:
+            source:
+                id: 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e
+                selector: "g:nth-child(1) g:nth-child(4) g:nth-child(10) circle:nth-child(1)     "
+                port: "AWS::ContainedInsideLink-AWS::EC2::Subnet-SubnetId"
+            target:
+                id: b48a2777-cf1e-48d7-9859-45210d4e89ed
+            z: 12
+        e0d306ce-aa29-4af9-8115-709cb314bbb4:
+            source:
+                id: 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e
+                selector: "g:nth-child(1) g:nth-child(4) g:nth-child(10) circle:nth-child(1)     "
+                port: "AWS::ContainedInsideLink-AWS::EC2::Subnet-SubnetId"
+            target:
+                id: b48a2777-cf1e-48d7-9859-45210d4e89ed
+            z: 12
+Mappings:
+    DBMap:
+        Mongo:
+            Port: 27017
+        Mysql:
+            Port: 3046
+    Template:
+        UserData:
+            OnBoot: |
+                Content-Type: multipart/mixed; boundary="//"
+                MIME-Version: 1.0
+                --//
+                Content-Type: text/cloud-config; charset="us-ascii"
+                MIME-Version: 1.0
+                Content-Transfer-Encoding: 7bit
+                Content-Disposition: attachment; filename="cloud-config.txt"
+
+                #cloud-config
+                cloud_final_modules:
+                - [scripts-user, always]
+
+                --//
+                Content-Type: text/x-shellscript; charset="us-ascii"
+                MIME-Version: 1.0
+                Content-Transfer-Encoding: 7bit
+                Content-Disposition: attachment; filename="userdata.txt"
+Resources:
+    # region ENVIRONMENT
+    VPC1:
+        Type: AWS::EC2::VPC
+        Properties:
+            CidrBlock: 172.31.0.0/16
+            EnableDnsHostnames: true
+            EnableDnsSupport: true
+            Tags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} General VPC
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: bfd0d0d5-d166-4dce-aa83-170b70858c79
+    Net1:
+        Type: AWS::EC2::Subnet
+        Properties:
+            CidrBlock: 172.31.0.0/24
+            VpcId: !Ref VPC1
+            AvailabilityZone: !Select
+                - 0
+                - Fn::GetAZs: !Ref AWS::Region
+            Tags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} Public Subnet
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: b48a2777-cf1e-48d7-9859-45210d4e89ed
+    # endregion
+    # region ROUTING
+    IGW1:
+        Type: AWS::EC2::InternetGateway
+        Properties:
+            Tags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} General IGW
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 5ef05761-700a-446a-b034-123395f54960
+    IGW1ToVPC1:
+        Type: AWS::EC2::VPCGatewayAttachment
+        Properties:
+            VpcId: !Ref VPC1
+            InternetGatewayId: !Ref IGW1
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 7666742b-970a-4b30-8f60-4448650c4e96
+    RTB1:
+        Type: AWS::EC2::RouteTable
+        Properties:
+            VpcId: !Ref VPC1
+            Tags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} Public RTB
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: d8a6ead3-b341-4a2c-9d56-717a6b69a024
+    RTBToSubnet:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties:
+            SubnetId: !Ref Net1
+            RouteTableId: !Ref RTB1
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: f1e2009c-1e3a-43a6-9042-47613659ff47
+    Route1:
+        Type: AWS::EC2::Route
+        DependsOn: IGW1ToVPC1
+        Properties:
+            RouteTableId: !Ref RTB1
+            GatewayId: !Ref IGW1
+            DestinationCidrBlock: 0.0.0.0/0
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: f51038b0-ed80-41a7-a4a2-e975e1c9205c
+    Route2:
+        Type: AWS::EC2::Route
+        DependsOn: IGW1ToVPC1
+        Properties:
+            RouteTableId: !Ref RTB1
+            GatewayId: !Ref IGW1
+            DestinationIpv6CidrBlock: ::/0
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 36f8f644-9dd7-4079-8667-948c9b795170
+    # endregion
+    # region SECURITY
+    NBGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupName: !Sub ${AWS::StackName} Notebook Group
+            GroupDescription: Access to notebooks via SSH
+            VpcId: !Ref VPC1
+            SecurityGroupIngress:
+                - CidrIp: 0.0.0.0/0
+                  IpProtocol: tcp
+                  FromPort: 22
+                  ToPort: 22
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 0f831c84-cc12-44ef-84df-85f2137aea6c
+    DBGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupName: !Sub ${AWS::StackName} Database Group
+            GroupDescription: Access to Database via SSH or Notebooks
+            VpcId: !Ref VPC1
+            SecurityGroupIngress:
+                - CidrIp: 0.0.0.0/0
+                  IpProtocol: tcp
+                  FromPort: 22
+                  ToPort: 22
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: fc661c1f-492f-4f45-b754-39c233247e10
+    NBToDB:
+        Type: AWS::EC2::SecurityGroupIngress
+        Properties:
+            GroupId: !Ref DBGroup
+            SourceSecurityGroupId: !Ref NBGroup
+            IpProtocol: tcp
+            FromPort: !FindInMap [DBMap, !Ref DBType, Port]
+            ToPort: !FindInMap [DBMap, !Ref DBType, Port]
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 2a7e0901-1d1f-4780-a89b-02902bac855a
+    EFSGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupName: !Sub ${AWS::StackName} EFS Group
+            GroupDescription: Access to EFS via Notebooks
+            VpcId: !Ref VPC1
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 4342fd1f-a1ab-4991-b80e-77569a96dab9
+    NBToEFS:
+        Type: AWS::EC2::SecurityGroupIngress
+        Properties:
+            GroupId: !Ref EFSGroup
+            SourceSecurityGroupId: !Ref NBGroup
+            IpProtocol: tcp
+            FromPort: 2049
+            ToPort: 2049
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: d8a3eb5e-2c62-41a5-bbce-fdea9aca8ad7
+    # endregion
+    # region EFS
+    EFS1:
+        Type: AWS::EFS::FileSystem
+        Properties:
+            AvailabilityZoneName: !GetAtt Net1.AvailabilityZone
+            FileSystemTags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} Repo
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 2f163848-9b92-471e-bbe1-4421bb36bc78
+    EFS1ToNet1:
+        Type: AWS::EFS::MountTarget
+        Properties:
+            FileSystemId: !Ref EFS1
+            SubnetId: !Ref Net1
+            SecurityGroups:
+                - !Ref EFSGroup
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 49fe75eb-742e-49a9-a81b-9aefe4550116
+    # endregion
+    # region EC2
+    DBRole:
+        Type: AWS::IAM::Role
+        Properties:
+            RoleName: !Sub ${AWS::StackName}-Database-Role
+            Description: Describe access to notebooks
+            AssumeRolePolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                          Service:
+                              - ec2.amazonaws.com
+                      Action:
+                          - sts:AssumeRole
+            Policies:
+                - PolicyName: DescribeInstances
+                  PolicyDocument:
+                      Version: 2012-10-17
+                      Statement:
+                          - Effect: Allow
+                            Action: ec2:DescribeInstances
+                            Resource: "*"
+            Path: /SageSaver/
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 189edcaf-48fc-4953-8709-3f5afbd706f5
+    DBProfile:
+        Type: "AWS::IAM::InstanceProfile"
+        Properties:
+            InstanceProfileName: !Sub ${AWS::StackName}-Database-Profile
+            Roles:
+                - !Ref DBRole
+            Path: "/SageSaver/"
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 49d265a5-8814-4542-9208-8d4e4092568d
+    DatabaseInstance:
+        Type: AWS::EC2::Instance
+        Properties:
+            ImageId: !Ref Linux2AMI
+            KeyName: !Ref DBKeyPair
+            InstanceType: !Ref DBInstanceType
+            IamInstanceProfile: !Ref DBRole
+            NetworkInterface:
+                - AssociatePublicIpAddress: true
+                  DeviceIndex: 0
+                  GroupSet:
+                      - DBGroup
+                  SubnetId:
+                      - Net1
+            BlockDeviceMappings: !If
+                - IsMongo
+                - - DeviceName: /dev/sdf
+                    Ebs:
+                        VolumeType: gp3
+                        VolumeSize: !Ref DBSize
+                        DeleteOnTermination: false
+                  - DeviceName: /dev/sdg
+                    Ebs:
+                        VolumeType: gp2
+                        VolumeSize: !Ref JournalSize
+                        DeleteOnTermination: false
+                  - DeviceName: /dev/sdh
+                    Ebs:
+                        VolumeType: gp2
+                        VolumeSize: !Ref LogSize
+                        DeleteOnTermination: false
+                - !If
+                  - IsMysql
+                  - - DeviceName: /dev/sdf
+                      Ebs:
+                          VolumeType: gp3
+                          VolumeSize: !Ref DBSize
+                          DeleteOnTermination: false
+                  - AWS::NoValue
+            UserData:
+                Fn::Base64: !Sub
+                    - |
+                        ${OnBootPrefix}
+                        #!/bin/bash
+                        /opt/aws/bin/cfn-init \
+                            --region ${AWS::Region} \
+                            -s ${AWS::StackName} \
+                            -r DatabaseInstance \
+                            -c Boot
+                        --//
+                    - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
+            Tags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} ${DBType}
+                - Key: sagesaver:stack-origin
+                  Value: !Ref AWS::StackName
+                - Key: sagesaver:server-type
+                  Value: Database
+        Metadata:
+            AWS::CloudFormation::Init:
+                Init:
+                    packages:
+                        yum:
+                            git: []
+                    files:
+                        /root/sagesaver/config.json:
+                            content: !Sub |
+                                {
+                                    "aws": {
+                                        "region": "${AWS::Region}",
+                                        "stack": "${AWS::StackName}"
+                                    },
+                                    "autostop": {
+                                        "time_limit": ${DBInactiveLimit},
+                                        "db_log": {
+                                            "path": "db.log"
+                                        },
+                                        "output": {
+                                            "time_format": "%Y-%m-%d %H:%M:%S"
+                                        }
+                                    }
+                                }
+
+                    commands:
+                        0_SetupServerEnvironment:
+                            command: !Sub |
+                                git clone https://github.com/Cozieee/sagesaver sagesaver-gh
+                                mv sagesaver-gh/${DBType}/boot/* ./sagesaver
+                                bash sagesaver-gh/${DBType}/env/setup.sh -u ${DBUsername} -p ${DBPassword}
+                                rm -rf sagesaver-gh
+                            cwd: /root
+                Boot:
+                    commands:
+                        0_CheckInitialized:
+                            command: !Sub |
+                                /opt/aws/bin/cfn-init \
+                                    --region ${AWS::Region} \
+                                    -s ${AWS::StackName} \
+                                    -r DatabaseInstance \
+                                    -c Init
+                            test: test ! -e sagesaver
+                            cwd: /root
+                        1_StartCron:
+                            command: bash boot.sh
+                            cwd: /root/sagesaver
+                configSets:
+                    Init:
+                        - Init
+                    Boot:
+                        - Boot
+            AWS::CloudFormation::Designer:
+                id: 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e
+    NBRole:
+        Type: AWS::IAM::Role
+        Properties:
+            RoleName: !Sub ${AWS::StackName}-Notebook-Role
+            Description: Describe & Start access to DB
+            AssumeRolePolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                          Service:
+                              - ec2.amazonaws.com
+                      Action:
+                          - sts:AssumeRole
+            Policies:
+                - PolicyName: DescribeInstances
+                  PolicyDocument:
+                      Version: 2012-10-17
+                      Statement:
+                          - Effect: Allow
+                            Action: ec2:DescribeInstances
+                            Resource: "*"
+                - PolicyName: StartDB
+                  PolicyDocument:
+                      Version: 2012-10-17
+                      Statement:
+                          - Effect: Allow
+                            Action: ec2:StartInstances
+                            Resource: !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${DatabaseInstance}
+            Path: /SageSaver/
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: c8e3670a-6632-4a61-8f87-ec46c1ae3a10
+    NBProfile:
+        Type: "AWS::IAM::InstanceProfile"
+        Properties:
+            InstanceProfileName: !Sub ${AWS::StackName}-Notebook-Profile
+            Path: /SageSaver/
+            Roles:
+                - !Ref NBRole
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 16c011d9-b6a4-43e7-9275-aaf4d596602d
+    # endregion
+    # region SECRETS
+    DBSecret:
+        Type: AWS::SecretsManager::Secret
+        Properties:
+            Name: !Sub ${AWS::StackName}-Database-Secret
+            Description: !Sub ${DBType} database credentials for ${AWS::StackName} SageSaver stack
+            SecretString: !Sub
+                - |
+                    {
+                        "username": "${DBUsername}",
+                        "password": "${DBPassword}"
+                        "port": "${DBPort}"
+                        "host": "${DBHost}"
+                    }
+                - DBPort: !FindInMap [DBMap, !Ref DBType, Port]
+                  DBHost: !GetAtt DatabaseInstance.PrivateIp
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: bb502e68-dac5-4d6a-8387-058944e3fc85
+    # endregion
+Outputs:
+    VPCID:
+        Description: ID of the environment's general VPC
+        Value: !Ref VPC1
+        Export:
+            Name: !Sub ${AWS::StackName}-VPCID
+    Net1ID:
+        Description: ID of the environment's public subnet
+        Value: !Ref Net1
+        Export:
+            Name: !Sub ${AWS::StackName}-PublicSubnetID
+    NBGroupID:
+        Description: ID of the shared notebook security group
+        Value: !Ref NBGroup
+        Export:
+            Name: !Sub ${AWS::StackName}-NotebookGroupID
+    EFSID:
+        Description: ID of the environment's shared EFS repo
+        Value: !Ref VPC1
+        Export:
+            Name: !Sub ${AWS::StackName}-EFSID
+    DBID:
+        Description: ID of the environment's ec2 database
+        Value: !Ref DatabaseInstance
+        Export:
+            Name: !Sub ${AWS::StackName}-DatabaseID
+    NBProfileName:
+        Description: Name of the shared Notebook Profile
+        Value: !Ref NBProfile
+        Export:
+            Name: !Sub ${AWS::StackName}-NotebookProfileName

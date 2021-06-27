@@ -6,15 +6,16 @@ from json.decoder import JSONDecodeError
 from bson import json_util
 import jmespath
 import boto3
-from pymongo import MongoClient
+
 from config import config
+from mongo_client import client
 
 REGION = config["aws"]["region"]
 VPC_ID = config["aws"]["vpc-id"]
 STACK_NAME = config["aws"]["stack"]
 DB_CONNECTION_STRING = config["aws"]["conn-str"]
 
-TIME_LIMIT = config["autostop"]["time_limit"]
+TIME_LIMIT = config["autostop"]["time_limit"] * 60
 DB_LOG_PATH = config["autostop"]["db_log"]["path"]
 OUTPUT_TIME_FORMAT = config["autostop"]["output"]["time_format"]
 
@@ -82,8 +83,6 @@ def seconds_ago(time):
     return (datetime.now() - time).total_seconds()
 
 def main():
-    client = MongoClient(DB_CONNECTION_STRING)
-    
     old_user_log = {}
     
     # Time of last update

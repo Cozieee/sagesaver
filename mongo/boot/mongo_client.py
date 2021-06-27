@@ -1,5 +1,10 @@
+import json
 import boto3
 from pymongo import MongoClient
+
+from config import config
+
+STACK_NAME = config["aws"]["stack"]
 
 def get_secret(stack_name):
     session = boto3.session.Session()
@@ -25,5 +30,4 @@ def get_mongo_client(stack_name):
     uri_str = f"mongodb://{db_username}:{db_password}@{db_host}:{db_port}"
     return MongoClient(uri_str)
 
-def get_mysql_client(stack_name):
-    pass
+client = get_mongo_client(STACK_NAME)

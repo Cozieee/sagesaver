@@ -7,6 +7,11 @@ function render_template() {
 for arg in "$@"
 do
     case $arg in
+        -u|--username)
+        MONGO_USER=$2
+        shift
+        shift
+        ;;
         -p|--password)
         MONGO_PWD=$2
         shift
@@ -71,7 +76,7 @@ service mongod start
 
 mongo <<EOF
 use admin
-db.createUser({ user: "admin", pwd: "${MONGO_PWD}", roles: ["root"] })
+db.createUser({ user: "${MONGO_USER}", pwd: "${MONGO_PWD}", roles: ["root"] })
 EOF
 
 AUTHORIZATION=enabled

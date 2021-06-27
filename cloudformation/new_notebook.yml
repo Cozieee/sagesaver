@@ -1,21 +1,74 @@
-AWSTemplateFormatVersion: "2010-09-09"
+# TODO Copy changes from environment
+# TODO Parameters for EFS attach, Inactivity, Collaborative, Jupyter or Lab
+# Mapping for directory paths
+AWSTemplateFormatVersion: 2010-09-09
 Parameters:
-    EnvironmentStack:
+    ENVStack:
         Type: String
         Description: Name of the SageSaver environment stack this notebook will
-            be attached to.
-    NotebookName:
+            be attached to. Create a new one from the GitHub README
+    NBInstanceType:
         Type: String
-        Description: Name of the notebook
-    NotebookPassword:
+        Description:
+            "Type of EC2 instance to launch. Suggestions - Micro: testing |
+            C5: Analysis | R5: Large Data | g4dn: ML Small-Scale | p3: ML Large-Scale"
+        Default: c5.large
+        AllowedValues:
+            - t2.micro
+            - t3.micro
+            - c5.large
+            - c5.xlarge
+            - c5.2xlarge
+            - c5.4xlarge
+            - c5.9xlarge
+            - r5.large
+            - r5.xlarge
+            - r5.2xlarge
+            - r5.4xlarge
+            - r5.8xlarge
+            - g4dn.xlarge
+            - g4dn.2xlarge
+            - g4dn.4xlarge
+            - g4dn.8xlarge
+            - p3.2xlarge
+            - p3.8xlarge
+    NBKeyPair:
+        Type: AWS::EC2::KeyPair::KeyName
+        Description: Keypair used to ssh into Notebook Server
+        AllowedPattern: .+
+        ConstraintDescription: is required
+    NBName:
+        Type: String
+        Description: Name of the notebook (i.e. 'General', 'Training', 'Analysis', etc.)
+    NBPassword:
         Type: String
         Default: Qw3rty11
+        MinLength: 8
+        MaxLength: 40
+        AllowedPattern: ^[a-zA-Z0-9]*$
+        ConstraintDescription: has invalid length or characters
+        NoEcho: true
     Linux2AMI:
-        Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+        Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
         Description: Don't edit this value
-        Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
-        AllowedValues: 
-                - '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+        Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+        AllowedValues:
+            - "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+Metadata:
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+            - Label:
+                  default: Environment
+              Parameters:
+                  - ENVStack
+            - Label:
+                  default: Notebook
+              Parameters:
+                  - NBInstanceType
+                  - NBKeyPair
+        ParameterLabels:
+            ENVStack:
+                default: Stack Name
 Mappings:
     Template:
         UserData:
@@ -38,59 +91,24 @@ Mappings:
                 Content-Transfer-Encoding: 7bit
                 Content-Disposition: attachment; filename="userdata.txt"
 Resources:
-    NBRole:
-        Type: AWS::IAM::Role
-        Properties:
-            Description: Describe & Start access to DB
-            Policies:
-                - PolicyName: DescribeInstances
-                  PolicyDocument:
-                      Version: 2012-10-17
-                      Statement:
-                          - Effect: Allow
-                            Action: ec2:DescribeInstances
-                            Resource: "*"
-                - PolicyName: StartDB
-                  PolicyDocument:
-                      Version: 2012-10-17
-                      Statement:
-                          - Effect: Allow
-                            Action: ec2:StartInstances
-                            Resource: 
-                                Fn::Sub:
-                                    - arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${DatabaseID}
-                                    - DBID: 
-                                        Fn::ImportValue: !Sub ${EnvironmentStack}-DatabaseID
-
-            AssumeRolePolicyDocument:
-                Version: 2012-10-17
-                Statement:
-                    - Effect: Allow
-                      Principal:
-                          Service:
-                              - ec2.amazonaws.com
-                      Action:
-                          - sts:AssumeRole
-            Path: /SageSaver/roles/
     NBServer:
         Type: AWS::EC2::Instance
         Properties:
             ImageId: !Ref Linux2AMI
-            # TODO Multiple Instance options
+            KeyName: NBKeyPair
             InstanceType: t2.micro
             IamInstanceProfile: !Ref NBRole
             NetworkInterface:
                 - AssociatePublicIpAddress: true
                   DeviceIndex: 0
                   GroupSet:
-                    - Fn::ImportValue: !Sub ${EnvironmentStack}-NotebookGroupID
-                  SubnetId: 
-                    Fn::ImportValue: !Sub ${EnvironmentStack}-PublicSubnetID
+                      - Fn::ImportValue: !Sub ${EnvironmentStack}-NotebookGroupID
+                  SubnetId:
+                      Fn::ImportValue: !Sub ${EnvironmentStack}-PublicSubnetID
             UserData:
                 Fn::Base64:
                     Fn::Sub:
-                        -
-                            |
+                        - |
                             ${OnBootPrefix}
                             #!/bin/bash
                             /opt/aws/bin/cfn-init \
@@ -100,12 +118,11 @@ Resources:
                                 -c Boot
                             --//
                         - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
-            KeyName: sagesaver
             Tags:
                 - Key: Name
-                  Value: !Sub AWS::StackName
+                  Value: !Ref NBName
                 - Key: sagesaver:stack-origin
-                  Value: !Ref NotebookName
+                  Value: !Ref AWS::StackName
                 - Key: sagesaver:server-type
                   Value: Notebook
         Metadata:
@@ -117,7 +134,7 @@ Resources:
                             amazon-efs-utils: []
                     files:
                         /root/sagesaver/config.json:
-                            content: 
+                            content:
                                 Fn::Sub:
                                     - |
                                         {
@@ -137,29 +154,28 @@ Resources:
                                             }
                                         }
                                     - DatabaseID:
-                                        Fn::ImportValue: !Sub ${EnvironmentStack}-DatabaseID
+                                          Fn::ImportValue: !Sub ${EnvironmentStack}-DatabaseID
                     commands:
                         0_SetupEFSDir:
-                            command:
-                                mkdir /home/ec2-user/efs
+                            command: mkdir /home/ec2-user/efs
                                 chmod go+rw /home/ec2-user/efs
                         1_SetupServerEnvironment:
                             command: !Sub |
                                 git clone https://github.com/Cozieee/sagesaver sagesaver-gh
-                                mv sagesaver-gh/notebook/boot/* ./sagesaver
-                                bash sagesaver-gh/notebook/env/setup.sh -p ${NotebookPassword}
+                                mv sagesaver-gh/notebook/src/* ./sagesaver
+                                bash sagesaver-gh/notebook/env/setup.sh -p ${NBPassword}
                                 rm -rf sagesaver-gh
                             cwd: /root
                 EFSBoilerPlate:
-                    files:
-                        /home/ec2-user/.env:
-                            content: !Sub |
-                                ENV_STACK_NAME="${EnvironmentStack}"
                     command:
-                        0_LoadBoilerPlate:
+                        0_CopyConfig:
+                            command: cp /root/sagesaver/config.json .
+                            cwd: /hom/ec2-user
+                        1_LoadBoilerPlate:
                             command:
                                 git clone https://github.com/Cozieee/sagesaver sagesaver-gh
                                 mv sagesaver-gh/notebook/efs/* efs/
+                                mv sagesaver-gh/tools efs/
                                 rm -rf sagesaver-gh
                             cwd: /home/ec2-user
                 Boot:
@@ -178,7 +194,7 @@ Resources:
                                 Fn::Sub:
                                     - mount -t efs ${EFSID} /home/ec2-user/efs
                                     - EFSID:
-                                        Fn::ImportValue: !Sub ${EnvironmentStack}-EFSID
+                                          Fn::ImportValue: !Sub ${EnvironmentStack}-EFSID
                         2_CheckEFSNotEmpty:
                             command: !Sub |
                                 /opt/aws/bin/cfn-init \
