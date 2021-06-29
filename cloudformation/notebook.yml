@@ -1,12 +1,11 @@
-# TODO Copy changes from environment
+# [ ] Secrets Manager Password
 # TODO Parameters for EFS attach, Inactivity, Collaborative, Jupyter or Lab
-# Mapping for directory paths
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
     EnvStack:
         Type: String
         Description: Name of the SageSaver environment stack this notebook will
-            be attached to. Create a new one from the GitHub README
+            be attached to. You can create a new one from the GitHub README step 1.
     NBInstanceType:
         Type: String
         Description:
@@ -42,6 +41,7 @@ Parameters:
         Description: Purpose of the notebook (i.e. 'General', 'Training', 'Analysis', etc.)
     NBPassword:
         Type: String
+        Description: Password used to login to Jupyter Notebook
         Default: Qw3rty11
         MinLength: 8
         MaxLength: 40
@@ -64,11 +64,27 @@ Metadata:
             - Label:
                   default: Notebook
               Parameters:
+                  - NBName
                   - NBInstanceType
                   - NBKeyPair
+                  - NBPassword
+            - Label:
+                  default: Enforced Configurations [DO NOT CHANGE]
+              Parameters:
+                  - Linux2AMI
         ParameterLabels:
             EnvStack:
-                default: Stack Name
+                default: Stack name
+            NBInstanceType:
+                default: EC2 Instance Type
+            NBKeyPair:
+                default: EC2 Key Pair
+            NBName:
+                default: Notebook Name
+            NBPassword:
+                default: Jupyter Password
+            Linux2AMI:
+                default: EC2 Instance Base AMI
 Mappings:
     Template:
         UserData:
@@ -97,8 +113,8 @@ Resources:
             ImageId: !Ref Linux2AMI
             KeyName: !Ref NBKeyPair
             InstanceType: !Ref NBInstanceType
-            IamInstanceProfile: 
-                Fn::ImportValue: !Sub ${EnvStack}-NotebookRoleID
+            IamInstanceProfile:
+                Fn::ImportValue: !Sub ${EnvStack}-NotebookProfileName
             NetworkInterfaces:
                 - AssociatePublicIpAddress: true
                   DeviceIndex: 0
@@ -107,18 +123,17 @@ Resources:
                   SubnetId:
                       Fn::ImportValue: !Sub ${EnvStack}-PublicSubnetID
             UserData:
-                Fn::Base64:
-                    Fn::Sub:
-                        - |
-                            ${OnBootPrefix}
-                            #!/bin/bash
-                            /opt/aws/bin/cfn-init \
-                                --region ${AWS::Region} \
-                                -s ${AWS::StackName} \
-                                -r NotebookInstance \
-                                -c Boot
-                            --//
-                        - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
+                Fn::Base64: !Sub
+                    - |
+                        ${OnBootPrefix}
+                        #!/bin/bash
+                        /opt/aws/bin/cfn-init \
+                            --region ${AWS::Region} \
+                            -s ${AWS::StackName} \
+                            -r NBInstance \
+                            -c Boot
+                        --//
+                    - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
             Tags:
                 - Key: Name
                   Value: !Ref NBName
@@ -136,49 +151,58 @@ Resources:
                     files:
                         /root/sagesaver/config.json:
                             content: !Sub
-                                    - |
-                                        {
-                                            "aws": {
-                                                "region": "${AWS::Region}",
-                                                "stack-origin": "${EnvStack}"
-                                                "stack": "${AWS::StackName}"
-                                                "db-id": "${DatabaseID}",
+                                - |
+                                    {
+                                        "aws": {
+                                            "region": "${AWS::Region}",
+                                            "stack-origin": "${EnvStack}",
+                                            "db-id": "${DatabaseID}"
+                                        },
+                                        "autostop": {
+                                            "time_limit": 1800,
+                                            "jupyter_log": {
+                                                "path": "/home/ec2-user/jupyter.log",
+                                                "time_format": "%Y-%m-%d %H:%M:%S"
                                             },
-                                            "autostop": {
-                                                "time_limit": 1800,
-                                                "jupyter_log": {
-                                                    "path": "/home/ec2-user/jupyter.log",
-                                                    "time_format": "%Y-%m-%d %H:%M:%S"
-                                                },
-                                                "output": {
-                                                    "time_format": "%Y-%m-%d %H:%M:%S"
-                                                }
+                                            "output": {
+                                                "time_format": "%Y-%m-%d %H:%M:%S"
                                             }
                                         }
-                                    - DatabaseID:
-                                          Fn::ImportValue: !Sub ${EnvStack}-DatabaseID
+                                    }
+                                - DatabaseID:
+                                      Fn::ImportValue: !Sub ${EnvStack}-DatabaseID
                     commands:
                         0_SetupEFSDir:
-                            command: mkdir /home/ec2-user/efs
+                            command: |
+                                mkdir /home/ec2-user/efs
                                 chmod go+rw /home/ec2-user/efs
                         1_SetupServerEnvironment:
                             command: !Sub |
                                 git clone https://github.com/Cozieee/sagesaver sagesaver-gh
-                                mv sagesaver-gh/notebook/src/* ./sagesaver
+                                mv sagesaver-gh/notebook/boot/* ./sagesaver
                                 bash sagesaver-gh/notebook/env/setup.sh -p ${NBPassword}
                                 rm -rf sagesaver-gh
                             cwd: /root
-                EFSBoilerPlate:
+                Tutorial:
+                    files:
+                        /home/ec2-user/config.json:
+                            content: !Sub |
+                                {
+                                    "aws": {
+                                        "region": "${AWS::Region}",
+                                        "stack-origin": "${EnvStack}"
+                                    }
+                                }
                     command:
-                        0_CopyConfig:
-                            command: cp /root/sagesaver/config.json .
-                            cwd: /hom/ec2-user
-                        1_LoadBoilerPlate:
-                            command:
-                                git clone https://github.com/Cozieee/sagesaver sagesaver-gh
-                                mv sagesaver-gh/notebook/efs/* efs/
-                                mv sagesaver-gh/tools efs/
-                                rm -rf sagesaver-gh
+                        0_LoadTutorial:
+                            command: !Sub
+                                - |
+                                    git clone https://github.com/Cozieee/sagesaver sagesaver-gh
+                                    mv sagesaver-gh/tutorials/db-connect/${DatabaseType}/* efs/
+                                    rm -rf sagesaver-gh
+                                - DatabaseType:
+                                      Fn::ImportValue: !Sub ${EnvStack}-DatabaseType
+
                             cwd: /home/ec2-user
                 Boot:
                     commands:
@@ -187,7 +211,7 @@ Resources:
                                 /opt/aws/bin/cfn-init \
                                     --region ${AWS::Region} \
                                     -s ${AWS::StackName} \
-                                    -r NotebookInstance \
+                                    -r NBInstance \
                                     -c Init
                             test: test ! -e sagesaver
                             cwd: /root
@@ -202,8 +226,8 @@ Resources:
                                 /opt/aws/bin/cfn-init \
                                     --region ${AWS::Region} \
                                     -s ${AWS::StackName} \
-                                    -r NotebookInstance \
-                                    -c EFSBoilerPlate
+                                    -r NBInstance \
+                                    -c Tutorial
                             test: test -z "$(ls -A efs)"
                             cwd: /home/ec2-user
                         3_StartCron:
@@ -212,5 +236,7 @@ Resources:
                 configSets:
                     Init:
                         - Init
+                    Tutorial:
+                        - Tutorial
                     Boot:
                         - Boot

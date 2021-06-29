@@ -1,3 +1,4 @@
+# [ ] Remove aws from config. Use metadata instead
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
     A cheaper sagemaker-studio-like jupyter environment made for AWS new-comers
@@ -842,9 +843,14 @@ Outputs:
             Name: !Sub ${AWS::StackName}-NotebookRoleID
     EFSID:
         Description: ID of the environment's shared EFS repo
-        Value: !Ref VPC1
+        Value: !Ref EFS1
         Export:
             Name: !Sub ${AWS::StackName}-EFSID
+    DBType:
+        Description: Type of database hosted in this environment
+        Value: !Ref DBType
+        Export:
+            Name: !Sub ${AWS::StackName}-DatabaseType 
     DBID:
         Description: ID of the environment's ec2 database
         Value: !Ref DBInstance
