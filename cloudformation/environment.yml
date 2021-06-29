@@ -1,23 +1,14 @@
-# [✓] Include username param in setup.sh
-# [✓] Provide EBS size options & Inactivity Period & Port option?
-# [✓] Update Designer
-# [✓] Use mappings for switch statements
-# [✓] Secrets Manager
-# [✓] Use secret for connection to database
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
-    A secure, sagemaker-studio-like jupyter environment made for AWS new-comers.
-    Comes pre-bundled with a database (Mongo/MySQL), cost-saving measures like
-    automatic inactivity  detection (adjustable), optional shared notebook 
-    repository (EFS), and fast environment & notebook launch speeds.
+    A cheaper sagemaker-studio-like jupyter environment made for AWS new-comers
 Parameters:
     DBType:
         Type: String
         Description: Type of database to host
-        Default: Mongo
+        Default: mongo
         AllowedValues:
-            - Mongo
-            - Mysql
+            - mongo
+            - mysql
     DBInstanceType:
         Type: String
         Description:
@@ -94,8 +85,8 @@ Parameters:
         Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
         ConstraintDescription: cannot be changed
 Conditions:
-    IsMongo: !Equals [!Ref DBType, Mongo]
-    IsMysql: !Equals [!Ref DBType, Mysql]
+    IsMongo: !Equals [!Ref DBType, mongo]
+    IsMysql: !Equals [!Ref DBType, mysql]
 Metadata:
     AWS::CloudFormation::Interface:
         ParameterGroups:
@@ -129,7 +120,7 @@ Metadata:
                 default: Password
             DBKeyPair:
                 default: EC2 Key Pair
-            DBSize: 
+            DBSize:
                 default: Storage Size
             DBInactiveLimit:
                 default: Inactive Time Limit
@@ -410,9 +401,9 @@ Metadata:
             z: 12
 Mappings:
     DBMap:
-        Mongo:
+        mongo:
             Port: 27017
-        Mysql:
+        mysql:
             Port: 3046
     Template:
         UserData:
@@ -618,14 +609,6 @@ Resources:
                               - ec2.amazonaws.com
                       Action:
                           - sts:AssumeRole
-            Policies:
-                - PolicyName: DescribeInstances
-                  PolicyDocument:
-                      Version: 2012-10-17
-                      Statement:
-                          - Effect: Allow
-                            Action: ec2:DescribeInstances
-                            Resource: "*"
             Path: /SageSaver/
         Metadata:
             AWS::CloudFormation::Designer:
@@ -640,44 +623,71 @@ Resources:
         Metadata:
             AWS::CloudFormation::Designer:
                 id: 49d265a5-8814-4542-9208-8d4e4092568d
-    DatabaseInstance:
+    NBRole:
+        Type: AWS::IAM::Role
+        Properties:
+            RoleName: !Sub ${AWS::StackName}-Notebook-Role
+            Description: Describe & Start access to DB
+            AssumeRolePolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                          Service:
+                              - ec2.amazonaws.com
+                      Action:
+                          - sts:AssumeRole
+            Path: /SageSaver/
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: c8e3670a-6632-4a61-8f87-ec46c1ae3a10
+    NBProfile:
+        Type: "AWS::IAM::InstanceProfile"
+        Properties:
+            InstanceProfileName: !Sub ${AWS::StackName}-Notebook-Profile
+            Roles:
+                - !Ref NBRole
+            Path: /SageSaver/
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 16c011d9-b6a4-43e7-9275-aaf4d596602d
+    DBInstance:
         Type: AWS::EC2::Instance
         Properties:
             ImageId: !Ref Linux2AMI
             KeyName: !Ref DBKeyPair
             InstanceType: !Ref DBInstanceType
-            IamInstanceProfile: !Ref DBRole
-            NetworkInterface:
+            IamInstanceProfile: !Ref DBProfile
+            NetworkInterfaces:
                 - AssociatePublicIpAddress: true
                   DeviceIndex: 0
                   GroupSet:
-                      - DBGroup
-                  SubnetId:
-                      - Net1
+                      - !Ref DBGroup
+                  SubnetId: !Ref Net1
             BlockDeviceMappings: !If
                 - IsMongo
                 - - DeviceName: /dev/sdf
                     Ebs:
                         VolumeType: gp3
                         VolumeSize: !Ref DBSize
-                        DeleteOnTermination: false
+                        DeleteOnTermination: true
                   - DeviceName: /dev/sdg
                     Ebs:
                         VolumeType: gp2
                         VolumeSize: !Ref JournalSize
-                        DeleteOnTermination: false
+                        DeleteOnTermination: true
                   - DeviceName: /dev/sdh
                     Ebs:
                         VolumeType: gp2
                         VolumeSize: !Ref LogSize
-                        DeleteOnTermination: false
+                        DeleteOnTermination: true
                 - !If
                   - IsMysql
                   - - DeviceName: /dev/sdf
                       Ebs:
                           VolumeType: gp3
                           VolumeSize: !Ref DBSize
-                          DeleteOnTermination: false
+                          DeleteOnTermination: true
                   - AWS::NoValue
             UserData:
                 Fn::Base64: !Sub
@@ -687,7 +697,7 @@ Resources:
                         /opt/aws/bin/cfn-init \
                             --region ${AWS::Region} \
                             -s ${AWS::StackName} \
-                            -r DatabaseInstance \
+                            -r DBInstance \
                             -c Boot
                         --//
                     - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
@@ -738,7 +748,7 @@ Resources:
                                 /opt/aws/bin/cfn-init \
                                     --region ${AWS::Region} \
                                     -s ${AWS::StackName} \
-                                    -r DatabaseInstance \
+                                    -r DBInstance \
                                     -c Init
                             test: test ! -e sagesaver
                             cwd: /root
@@ -752,51 +762,6 @@ Resources:
                         - Boot
             AWS::CloudFormation::Designer:
                 id: 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e
-    NBRole:
-        Type: AWS::IAM::Role
-        Properties:
-            RoleName: !Sub ${AWS::StackName}-Notebook-Role
-            Description: Describe & Start access to DB
-            AssumeRolePolicyDocument:
-                Version: 2012-10-17
-                Statement:
-                    - Effect: Allow
-                      Principal:
-                          Service:
-                              - ec2.amazonaws.com
-                      Action:
-                          - sts:AssumeRole
-            Policies:
-                - PolicyName: DescribeInstances
-                  PolicyDocument:
-                      Version: 2012-10-17
-                      Statement:
-                          - Effect: Allow
-                            Action: ec2:DescribeInstances
-                            Resource: "*"
-                - PolicyName: StartDB
-                  PolicyDocument:
-                      Version: 2012-10-17
-                      Statement:
-                          - Effect: Allow
-                            Action: ec2:StartInstances
-                            Resource: !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${DatabaseInstance}
-            Path: /SageSaver/
-        Metadata:
-            AWS::CloudFormation::Designer:
-                id: c8e3670a-6632-4a61-8f87-ec46c1ae3a10
-    NBProfile:
-        Type: "AWS::IAM::InstanceProfile"
-        Properties:
-            InstanceProfileName: !Sub ${AWS::StackName}-Notebook-Profile
-            Path: /SageSaver/
-            Roles:
-                - !Ref NBRole
-        Metadata:
-            AWS::CloudFormation::Designer:
-                id: 16c011d9-b6a4-43e7-9275-aaf4d596602d
-    # endregion
-    # region SECRETS
     DBSecret:
         Type: AWS::SecretsManager::Secret
         Properties:
@@ -806,15 +771,53 @@ Resources:
                 - |
                     {
                         "username": "${DBUsername}",
-                        "password": "${DBPassword}"
-                        "port": "${DBPort}"
+                        "password": "${DBPassword}",
+                        "port": ${DBPort},
                         "host": "${DBHost}"
                     }
                 - DBPort: !FindInMap [DBMap, !Ref DBType, Port]
-                  DBHost: !GetAtt DatabaseInstance.PrivateIp
+                  DBHost: !GetAtt DBInstance.PrivateIp
         Metadata:
             AWS::CloudFormation::Designer:
                 id: bb502e68-dac5-4d6a-8387-058944e3fc85
+    DescribeInstancesPolicy:
+        Type: AWS::IAM::Policy
+        Properties:
+            PolicyName: !Sub ${AWS::StackName}-DescribeInstances
+            PolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Action: ec2:DescribeInstances
+                      Resource: "*"
+            Roles:
+                - !Ref DBRole
+                - !Ref NBRole
+    AccessDBSecretPolicy:
+        Type: AWS::IAM::Policy
+        Properties:
+            PolicyName: !Sub ${AWS::StackName}-AccessDatabaseSecret
+            PolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Action: secretsmanager:GetSecretValue
+                      Resource: !Ref DBSecret
+            Roles:
+                - !Ref DBRole
+                - !Ref NBRole
+    StartDBPolicy:
+        Type: AWS::IAM::Policy
+        Properties:
+            PolicyName: !Sub ${AWS::StackName}-StartDatabase
+            PolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Action: ec2:StartInstances
+                      Resource: !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${DBInstance}
+            Roles:
+                - !Ref NBRole
     # endregion
 Outputs:
     VPCID:
@@ -832,6 +835,11 @@ Outputs:
         Value: !Ref NBGroup
         Export:
             Name: !Sub ${AWS::StackName}-NotebookGroupID
+    NBRoleID:
+        Description: IAM Service role for environment notebooks
+        Value: !Ref NBRole
+        Export:
+            Name: !Sub ${AWS::StackName}-NotebookRoleID
     EFSID:
         Description: ID of the environment's shared EFS repo
         Value: !Ref VPC1
@@ -839,7 +847,7 @@ Outputs:
             Name: !Sub ${AWS::StackName}-EFSID
     DBID:
         Description: ID of the environment's ec2 database
-        Value: !Ref DatabaseInstance
+        Value: !Ref DBInstance
         Export:
             Name: !Sub ${AWS::StackName}-DatabaseID
     NBProfileName:

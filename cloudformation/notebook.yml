@@ -3,7 +3,7 @@
 # Mapping for directory paths
 AWSTemplateFormatVersion: 2010-09-09
 Parameters:
-    ENVStack:
+    EnvStack:
         Type: String
         Description: Name of the SageSaver environment stack this notebook will
             be attached to. Create a new one from the GitHub README
@@ -39,7 +39,7 @@ Parameters:
         ConstraintDescription: is required
     NBName:
         Type: String
-        Description: Name of the notebook (i.e. 'General', 'Training', 'Analysis', etc.)
+        Description: Purpose of the notebook (i.e. 'General', 'Training', 'Analysis', etc.)
     NBPassword:
         Type: String
         Default: Qw3rty11
@@ -60,14 +60,14 @@ Metadata:
             - Label:
                   default: Environment
               Parameters:
-                  - ENVStack
+                  - EnvStack
             - Label:
                   default: Notebook
               Parameters:
                   - NBInstanceType
                   - NBKeyPair
         ParameterLabels:
-            ENVStack:
+            EnvStack:
                 default: Stack Name
 Mappings:
     Template:
@@ -91,20 +91,21 @@ Mappings:
                 Content-Transfer-Encoding: 7bit
                 Content-Disposition: attachment; filename="userdata.txt"
 Resources:
-    NBServer:
+    NBInstance:
         Type: AWS::EC2::Instance
         Properties:
             ImageId: !Ref Linux2AMI
-            KeyName: NBKeyPair
-            InstanceType: t2.micro
-            IamInstanceProfile: !Ref NBRole
-            NetworkInterface:
+            KeyName: !Ref NBKeyPair
+            InstanceType: !Ref NBInstanceType
+            IamInstanceProfile: 
+                Fn::ImportValue: !Sub ${EnvStack}-NotebookRoleID
+            NetworkInterfaces:
                 - AssociatePublicIpAddress: true
                   DeviceIndex: 0
                   GroupSet:
-                      - Fn::ImportValue: !Sub ${EnvironmentStack}-NotebookGroupID
+                      - Fn::ImportValue: !Sub ${EnvStack}-NotebookGroupID
                   SubnetId:
-                      Fn::ImportValue: !Sub ${EnvironmentStack}-PublicSubnetID
+                      Fn::ImportValue: !Sub ${EnvStack}-PublicSubnetID
             UserData:
                 Fn::Base64:
                     Fn::Sub:
@@ -134,12 +135,13 @@ Resources:
                             amazon-efs-utils: []
                     files:
                         /root/sagesaver/config.json:
-                            content:
-                                Fn::Sub:
+                            content: !Sub
                                     - |
                                         {
                                             "aws": {
                                                 "region": "${AWS::Region}",
+                                                "stack-origin": "${EnvStack}"
+                                                "stack": "${AWS::StackName}"
                                                 "db-id": "${DatabaseID}",
                                             },
                                             "autostop": {
@@ -154,7 +156,7 @@ Resources:
                                             }
                                         }
                                     - DatabaseID:
-                                          Fn::ImportValue: !Sub ${EnvironmentStack}-DatabaseID
+                                          Fn::ImportValue: !Sub ${EnvStack}-DatabaseID
                     commands:
                         0_SetupEFSDir:
                             command: mkdir /home/ec2-user/efs
@@ -194,7 +196,7 @@ Resources:
                                 Fn::Sub:
                                     - mount -t efs ${EFSID} /home/ec2-user/efs
                                     - EFSID:
-                                          Fn::ImportValue: !Sub ${EnvironmentStack}-EFSID
+                                          Fn::ImportValue: !Sub ${EnvStack}-EFSID
                         2_CheckEFSNotEmpty:
                             command: !Sub |
                                 /opt/aws/bin/cfn-init \

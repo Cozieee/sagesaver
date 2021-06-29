@@ -1,0 +1,349 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+    A cheaper sagemaker-studio-like jupyter environment made for AWS new-comers.
+    Comes pre-bundled with a database (Mongo/MySQL), cost-saving measures like
+    automatic inactivity  detection (adjustable), optional shared notebook 
+    repository (EFS), and fast environment & notebook launch speeds.
+Parameters:
+    DBType:
+        Type: String
+        Description: Type of database to host
+        Default: Mongo
+        AllowedValues:
+            - Mongo
+            - Mysql
+    DBInstanceType:
+        Type: String
+        Description:
+            "Type of EC2 instance to launch. Recommended - Micro: testing |
+            T3: Small-scale, volatile r/w | M5: Mid-Scale | R5: Large-Scale"
+        Default: r5.large
+        AllowedValues:
+            - t2.micro
+            - t3.micro
+            - t3.small
+            - t3.medium
+            - t3.large
+            - t3.xlarge
+            - t3.2xlarge
+            - m5.large
+            - m5.xlarge
+            - m5.2xlarge
+            - m5.4xlarge
+            - m5.8xlarge
+            - r5.large
+            - r5.xlarge
+            - r5.2xlarge
+            - r5.4xlarge
+            - r5.8xlarge
+    DBKeyPair:
+        Type: AWS::EC2::KeyPair::KeyName
+        Description: Keypair used to ssh into database
+        AllowedPattern: .+
+        ConstraintDescription: is required
+    DBUsername:
+        Type: String
+        Description: Username used to connect to database
+        Default: Admin
+        MinLength: 1
+        MaxLength: 40
+        AllowedPattern: ^[a-zA-Z0-9]*$
+        ConstraintDescription: has invalid length or characters
+    DBPassword:
+        Type: String
+        Description: Password used to connect to database
+        Default: dsuMLppftw21
+        MinLength: 8
+        MaxLength: 40
+        AllowedPattern: ^[a-zA-Z0-9]*$
+        ConstraintDescription: has invalid length or characters
+        NoEcho: true
+    DBSize:
+        Type: Number
+        Description: Size of the database (GB)
+        Default: 20
+        MinValue: 1
+        ConstraintDescription: must be at least 1 GB
+    DBInactiveLimit:
+        Type: Number
+        Description: Minutes database can be inactive (no queries) before shutting down
+        Default: 30
+        MinValue: 5
+        MaxValue: 1440
+    JournalSize:
+        Type: Number
+        Description: Size (GB) of EBS volume reserved for Mongo journal. 20% of data size is suggested.
+        Default: 4
+        MinValue: 1
+        ConstraintDescription: must be at least 1 GB
+    LogSize:
+        Type: Number
+        Description: Size (GB) of EBS volume reserved for Mongo Log. 10% of data size is suggested.
+        Default: 2
+        MinValue: 1
+        ConstraintDescription: must be at least 1 GB
+    Linux2AMI:
+        Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+        Description: Image used for instances
+        Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+        ConstraintDescription: cannot be changed
+Conditions:
+    IsMongo: !Equals [!Ref DBType, Mongo]
+    IsMysql: !Equals [!Ref DBType, Mysql]
+Metadata:
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+            - Label:
+                  default: Database
+              Parameters:
+                  - DBType
+                  - DBInstanceType
+                  - DBKeyPair
+                  - DBUsername
+                  - DBPassword
+                  - DBSize
+                  - DBInactiveLimit
+            - Label:
+                  default: MongoDB [IF SELECTED]
+              Parameters:
+                  - JournalSize
+                  - LogSize
+            - Label:
+                  default: Enforced Configurations [DO NOT CHANGE]
+              Parameters:
+                  - Linux2AMI
+        ParameterLabels:
+            DBType:
+                default: DMS Type
+            DBInstanceType:
+                default: EC2 Instance Type
+            DBUsername:
+                default: Username
+            DBPassword:
+                default: Password
+            DBKeyPair:
+                default: EC2 Key Pair
+            DBSize: 
+                default: Storage Size
+            DBInactiveLimit:
+                default: Inactive Time Limit
+            JournalSize:
+                default: Journal Size
+            LogSize:
+                default: Log Size
+            Linux2AMI:
+                default: EC2 Instance Base AMI
+Mappings:
+    DBMap:
+        Mongo:
+            Port: 27017
+        Mysql:
+            Port: 3046
+    Template:
+        UserData:
+            OnBoot: |
+                Content-Type: multipart/mixed; boundary="//"
+                MIME-Version: 1.0
+                --//
+                Content-Type: text/cloud-config; charset="us-ascii"
+                MIME-Version: 1.0
+                Content-Transfer-Encoding: 7bit
+                Content-Disposition: attachment; filename="cloud-config.txt"
+
+                #cloud-config
+                cloud_final_modules:
+                - [scripts-user, always]
+
+                --//
+                Content-Type: text/x-shellscript; charset="us-ascii"
+                MIME-Version: 1.0
+                Content-Transfer-Encoding: 7bit
+                Content-Disposition: attachment; filename="userdata.txt"
+Resources:
+    VPC1:
+        Type: AWS::EC2::VPC
+        Properties:
+            CidrBlock: 172.31.0.0/16
+            EnableDnsHostnames: true
+            EnableDnsSupport: true
+            Tags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} General VPC
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: bfd0d0d5-d166-4dce-aa83-170b70858c79
+    Net1:
+        Type: AWS::EC2::Subnet
+        Properties:
+            CidrBlock: 172.31.0.0/24
+            VpcId: !Ref VPC1
+            AvailabilityZone: !Select
+                - 0
+                - Fn::GetAZs: !Ref AWS::Region
+            Tags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} Public Subnet
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: b48a2777-cf1e-48d7-9859-45210d4e89ed
+    DBGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupName: !Sub ${AWS::StackName} Database Group
+            GroupDescription: Access to Database via SSH or Notebooks
+            VpcId: !Ref VPC1
+            SecurityGroupIngress:
+                - CidrIp: 0.0.0.0/0
+                  IpProtocol: tcp
+                  FromPort: 22
+                  ToPort: 22
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: fc661c1f-492f-4f45-b754-39c233247e10
+    DBRole:
+        Type: AWS::IAM::Role
+        Properties:
+            RoleName: !Sub ${AWS::StackName}-Database-Role
+            Description: Describe access to notebooks
+            AssumeRolePolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Principal:
+                          Service:
+                              - ec2.amazonaws.com
+                      Action:
+                          - sts:AssumeRole
+            Policies:
+                - PolicyName: DescribeInstances
+                  PolicyDocument:
+                      Version: 2012-10-17
+                      Statement:
+                          - Effect: Allow
+                            Action: ec2:DescribeInstances
+                            Resource: "*"
+            Path: /SageSaver/
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 189edcaf-48fc-4953-8709-3f5afbd706f5
+    DBProfile:
+        Type: "AWS::IAM::InstanceProfile"
+        Properties: 
+            InstanceProfileName: !Sub ${AWS::StackName}-Database-Profile
+            Roles:
+                - !Ref DBRole
+            Path: "/SageSaver/"
+        Metadata:
+            AWS::CloudFormation::Designer:
+                id: 49d265a5-8814-4542-9208-8d4e4092568d
+    DatabaseInstance:
+        Type: AWS::EC2::Instance
+        Properties:
+            ImageId: !Ref Linux2AMI
+            KeyName: !Ref DBKeyPair
+            InstanceType: !Ref DBInstanceType
+            IamInstanceProfile: !Ref DBProfile
+            NetworkInterfaces:
+                - AssociatePublicIpAddress: true
+                  DeviceIndex: 0
+                  GroupSet:
+                      - !Ref DBGroup
+                  SubnetId: !Ref Net1
+            BlockDeviceMappings: !If
+                - IsMongo
+                - - DeviceName: /dev/sdf
+                    Ebs:
+                        VolumeType: gp3
+                        VolumeSize: !Ref DBSize
+                        DeleteOnTermination: true
+                  - DeviceName: /dev/sdg
+                    Ebs:
+                        VolumeType: gp2
+                        VolumeSize: !Ref JournalSize
+                        DeleteOnTermination: true
+                  - DeviceName: /dev/sdh
+                    Ebs:
+                        VolumeType: gp2
+                        VolumeSize: !Ref LogSize
+                        DeleteOnTermination: true
+                - !If
+                  - IsMysql
+                  - - DeviceName: /dev/sdf
+                      Ebs:
+                          VolumeType: gp3
+                          VolumeSize: !Ref DBSize
+                          DeleteOnTermination: true
+                  - AWS::NoValue
+            UserData:
+                Fn::Base64: !Sub
+                    - |
+                        ${OnBootPrefix}
+                        #!/bin/bash
+                        /opt/aws/bin/cfn-init \
+                            --region ${AWS::Region} \
+                            -s ${AWS::StackName} \
+                            -r DatabaseInstance \
+                            -c Boot
+                        --//
+                    - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
+            Tags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} ${DBType}
+                - Key: sagesaver:stack-origin
+                  Value: !Ref AWS::StackName
+                - Key: sagesaver:server-type
+                  Value: Database
+        Metadata:
+            AWS::CloudFormation::Init:
+                Init:
+                    packages:
+                        yum:
+                            git: []
+                    files:
+                        /root/sagesaver/config.json:
+                            content: !Sub |
+                                {
+                                    "aws": {
+                                        "region": "${AWS::Region}",
+                                        "stack": "${AWS::StackName}"
+                                    },
+                                    "autostop": {
+                                        "time_limit": ${DBInactiveLimit},
+                                        "db_log": {
+                                            "path": "db.log"
+                                        },
+                                        "output": {
+                                            "time_format": "%Y-%m-%d %H:%M:%S"
+                                        }
+                                    }
+                                }
+
+                    commands:
+                        0_SetupServerEnvironment:
+                            command: !Sub |
+                                git clone https://github.com/Cozieee/sagesaver sagesaver-gh
+                                mv sagesaver-gh/${DBType}/boot/* ./sagesaver
+                                bash sagesaver-gh/${DBType}/env/setup.sh -u ${DBUsername} -p ${DBPassword}
+                                rm -rf sagesaver-gh
+                            cwd: /root
+                Boot:
+                    commands:
+                        0_CheckInitialized:
+                            command: !Sub |
+                                /opt/aws/bin/cfn-init \
+                                    --region ${AWS::Region} \
+                                    -s ${AWS::StackName} \
+                                    -r DatabaseInstance \
+                                    -c Init
+                            test: test ! -e sagesaver
+                            cwd: /root
+                        1_StartCron:
+                            command: bash boot.sh
+                            cwd: /root/sagesaver
+                configSets:
+                    Init:
+                        - Init
+                    Boot:
+                        - Boot
+            AWS::CloudFormation::Designer:
+                id: 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e

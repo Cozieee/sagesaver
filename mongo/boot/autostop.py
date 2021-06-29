@@ -8,12 +8,10 @@ import jmespath
 import boto3
 
 from config import config
-from mongo_client import client
+from client import client as mongo_client
 
-REGION = config["aws"]["region"]
-VPC_ID = config["aws"]["vpc-id"]
+AWS_REGION = config["aws"]["region"]
 STACK_NAME = config["aws"]["stack"]
-DB_CONNECTION_STRING = config["aws"]["conn-str"]
 
 TIME_LIMIT = config["autostop"]["time_limit"] * 60
 DB_LOG_PATH = config["autostop"]["db_log"]["path"]
@@ -45,20 +43,18 @@ def new_operations(old, new):
     
     return n
 
-def notebooks_running(zone, stack):
+def notebooks_running(client, stack):
     """Count Number of notebook servers currently
     running in a stack
     
     Args:
-        region: Availability zone the stack's vpc is in
-        vpc: Id of the VPC the stack is hosted
-        stack: Name of the stack
+        client (boto3 service client): EC2 Service Client
+        stack: Name of the SageSaver Environment stack
         
     Returns:
         Number of stack notebook servers that are running
     """
-    ec2 = boto3.client('ec2', zone)
-    
+
     filters = [
         {
             "Name": "tag:sagesaver:stack-origin",
@@ -74,7 +70,7 @@ def notebooks_running(zone, stack):
         }
     ]
     
-    response = ec2.describe_instances(Filters = filters)
+    response = client.describe_instances(Filters = filters)
     notebook_instances = jmespath.search("Reservations[].Instances[].InstanceId", response)
 
     return notebook_instances
@@ -83,6 +79,7 @@ def seconds_ago(time):
     return (datetime.now() - time).total_seconds()
 
 def main():
+    aws_session = boto3.session.Session(region_name=AWS_REGION)
     old_user_log = {}
     
     # Time of last update
@@ -103,7 +100,7 @@ def main():
         old_user_log["aux"] = None
     
     # Create new log from totals
-    new_user_log = client.admin.command('top')['totals']
+    new_user_log = mongo_client.admin.command('top')['totals']
     
     # Filter log fields for user-generated collections only
     new_user_log = exclude_admin_collections(new_user_log)
@@ -136,7 +133,8 @@ def main():
         return print('Shutdown not met')
     
     # Count Notebooks running
-    count_nbs = len(notebooks_running(REGION, STACK_NAME))
+    sm_client = aws_session.client('ec2')
+    count_nbs = len(notebooks_running(sm_client, STACK_NAME))
     pred = count_nbs > 0
     print(f"NBS: {count_nbs}", end = ' ' if pred else ' | ')
     
