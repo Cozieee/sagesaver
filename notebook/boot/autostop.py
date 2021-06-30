@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 import jmespath
 
-from config import config
+from tools.config import config
 
 INACTIVE_TIME_LIMIT = config["autostop"]["time_limit"]
 JUPYTER_LOG_PATH = config["autostop"]["jupyter_log"]["path"]
@@ -38,8 +38,6 @@ def get_last_active(path):
                 
     return last_active_line
 
-def seconds_ago(time):
-    return (datetime.now() - time).total_seconds()
 
 last_line = get_last_active(JUPYTER_LOG_PATH)
 seconds_idle = seconds_ago(get_log_time(last_line))

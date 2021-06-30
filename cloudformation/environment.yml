@@ -728,8 +728,7 @@ Resources:
                                         "db_log": {
                                             "path": "db.log"
                                         },
-                                        "output": {
-                                            "time_format": "%Y-%m-%d %H:%M:%S"
+                                        "output": {n
                                         }
                                     }
                                 }
@@ -739,7 +738,7 @@ Resources:
                             command: !Sub |
                                 git clone https://github.com/Cozieee/sagesaver sagesaver-gh
                                 mv sagesaver-gh/${DBType}/boot/* ./sagesaver
-                                bash sagesaver-gh/${DBType}/env/setup.sh -u ${DBUsername} -p ${DBPassword}
+                                bash sagesaver-gh/${DBType}/env/setup.sh -u '${DBUsername}' -p '${DBPassword}'
                                 rm -rf sagesaver-gh
                             cwd: /root
                 Boot:

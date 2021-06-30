@@ -1,0 +1,18 @@
+name: Publish sagesaver-tools to PyPi
+on:
+    push:
+        branches:
+            - master
+jobs:
+    publish:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Prepare repo
+              uses: actions/checkout@master
+            - name: Publish Python Package
+              uses: mariamrf/py-package-publish-action@v1.1.0
+              with:
+                  subdir: sagesaver-tools
+              env:
+                  TWINE_USERNAME: Cozieee
+                  TWINE_PASSWORD: ${{ secrets.PIP_PASSWORD }}
