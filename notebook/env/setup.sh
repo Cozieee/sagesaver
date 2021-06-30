@@ -27,11 +27,13 @@ done
 python3 -m venv /root/sagesaver/root-env
 source /root/sagesaver/root-env/bin/activate
 pip3 install -r requirements_root.txt
+(cd ../../sagesaver-tools; python3 setup.py install)
 deactivate
 
 su ec2-user -c "python3 -m venv /home/ec2-user/notebook-env"
 source /home/ec2-user/notebook-env/bin/activate
 pip3 install -r requirements_notebook.txt
+(cd ../../sagesaver-tools; python3 setup.py install)
 
 JPY_SHA=$(
 python3 - <<-EOF
