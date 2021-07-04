@@ -34,7 +34,7 @@ mysql --user=root --password=$DB_PWD --execute="
 RENAME USER 'root'@'localhost' TO '$DB_USER'@'%';
 FLUSH PRIVILEGES;
 
-SET GLOBAL log_output = "FILE";
-SET GLOBAL general_log_file = "db.log";
+SET GLOBAL log_output = 'FILE';
+SET GLOBAL general_log_file = 'db.log';
 SET GLOBAL general_log = 'ON';
 "
