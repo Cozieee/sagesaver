@@ -43,7 +43,7 @@ class Database(Server, ABC):
         return notebook_instances
     
     def autostop(self):
-        log = ConditionsLog(entry_delim=' | ')
+        log = []
         shutdown = True
         
         if shutdown:

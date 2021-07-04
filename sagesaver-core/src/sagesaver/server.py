@@ -2,7 +2,7 @@ import boto3
 import jmespath
 import json
 from pymongo import MongoClient
-from werkzeug.utils import cached_property
+from cached_property import cached_property
 from configparser import ConfigParser
 
 from sagesaver.metadata import metadata_plus as mp

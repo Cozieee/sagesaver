@@ -1,7 +1,7 @@
 # Required: -p [Jupyter Password]
 # Optional: -h [Jupyter Port Number]
 
-cd "$( dirname "${BASH_SOURCE[0]}" )"
+DIR=$( dirname "${BASH_SOURCE[0]}" )
 
 function render_template() {
   eval "echo \"$(cat $1)\""
@@ -24,16 +24,7 @@ do
     esac
 done
 
-python3 -m venv /root/sagesaver/root-env
-source /root/sagesaver/root-env/bin/activate
-pip3 install -r requirements_root.txt
-(cd ../../sagesaver-tools; python3 setup.py install)
-deactivate
-
-su ec2-user -c "python3 -m venv /home/ec2-user/notebook-env"
-source /home/ec2-user/notebook-env/bin/activate
-pip3 install -r requirements_notebook.txt
-(cd ../../sagesaver-tools; python3 setup.py install)
+pip3 install -r $DIR/requirements_root.txt
 
 JPY_SHA=$(
 python3 - <<-EOF
@@ -41,7 +32,11 @@ from IPython.lib import passwd
 print(passwd('$JPY_PWD'))
 EOF
 )
-deactivate
 
-render_template jupyter_lab_config.py.tmpl \
-    > /home/ec2-user/notebook-env/etc/jupyter/jupyter_lab_config.py
+mkdir /home/ec2-user/.jupyter
+render_template $DIR/jupyter_lab_config.py.tmpl \
+    > /home/ec2-user/.jupyter/jupyter_lab_config.py
+
+su ec2-user
+pip3 install -r $DIR/requirements_notebook.txt
+sudo su

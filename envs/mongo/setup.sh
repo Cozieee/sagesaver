@@ -20,12 +20,6 @@ do
     esac
 done
 
-python3 -m venv /root/sagesaver/root-env
-source /root/sagesaver/root-env/bin/activate
-pip3 install -r requirements_root.txt
-(cd ../../sagesaver-tools; python3 setup.py install)
-deactivate
-
 cp ./mongodb-org-4.4.repo /etc/yum.repos.d/
 yum -y install mongodb-org
 

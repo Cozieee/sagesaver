@@ -12,12 +12,12 @@ class CleanCommand(Command):
         os.system('rm -vrf ./build ./dist ./*.pyc ./*.tgz ./*.egg-info')
 
 setup(
-    name="sagesaver-tools",
+    name="sagesaver-core",
     version="0.1.2",
     author="Victor Lin",
     author_email="vvictor.llin@gmail.com",
     description="Utils for SageSaver server scripts",
-    url="https://github.com/Cozieee/sagesaver/sagesaver-tools",
+    url="https://github.com/Cozieee/sagesaver/sagesaver-core",
     project_urls={
         "Project Main": "https://github.com/Cozieee/sagesaver",
     },
@@ -25,7 +25,9 @@ setup(
         'boto3',
         'pymongo',
         'pymysql',
-        'jmespath'
+        'jmespath',
+        'cached_property',
+        'ec2_metadata'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

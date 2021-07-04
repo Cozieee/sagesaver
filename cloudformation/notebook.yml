@@ -149,26 +149,16 @@ Resources:
                             git: []
                             amazon-efs-utils: []
                     files:
-                        /root/sagesaver/config.json:
+                        /etc/sagesaver.conf:
                             content: !Sub
                                 - |
-                                    {
-                                        "aws": {
-                                            "region": "${AWS::Region}",
-                                            "stack-origin": "${EnvStack}",
-                                            "db-id": "${DatabaseID}"
-                                        },
-                                        "autostop": {
-                                            "time_limit": 1800,
-                                            "jupyter_log": {
-                                                "path": "/home/ec2-user/jupyter.log",
-                                                "time_format": "%Y-%m-%d %H:%M:%S"
-                                            },
-                                            "output": {
-                                                "time_format": "%Y-%m-%d %H:%M:%S"
-                                            }
-                                        }
-                                    }
+                                    [autostop]
+                                    time_limit = 1800
+                                    output_format = %Y-%m-%d %H:%M:%S
+
+                                    [jupyter_log]
+                                    path = /home/ec2-user/jupyter.log
+                                    time_format = %Y-%m-%d %H:%M:%S
                                 - DatabaseID:
                                       Fn::ImportValue: !Sub ${EnvStack}-DatabaseID
                     commands:
@@ -179,30 +169,19 @@ Resources:
                         1_SetupServerEnvironment:
                             command: !Sub |
                                 git clone https://github.com/Cozieee/sagesaver sagesaver-gh
-                                mv sagesaver-gh/notebook/boot/* ./sagesaver
-                                bash sagesaver-gh/notebook/env/setup.sh -p ${NBPassword}
+                                bash sagesaver-gh/envs/setup.sh -s 'notebook' -p '${NBPassword}'
                                 rm -rf sagesaver-gh
                             cwd: /root
                 Tutorial:
-                    files:
-                        /home/ec2-user/config.json:
-                            content: !Sub |
-                                {
-                                    "aws": {
-                                        "region": "${AWS::Region}",
-                                        "stack-origin": "${EnvStack}"
-                                    }
-                                }
                     command:
                         0_LoadTutorial:
                             command: !Sub
                                 - |
                                     git clone https://github.com/Cozieee/sagesaver sagesaver-gh
-                                    mv sagesaver-gh/tutorials/db-connect/${DatabaseType}/* efs/
+                                    mv sagesaver-gh/tutorials/db-connect/${DatabaseType}Example.ipynb efs/
                                     rm -rf sagesaver-gh
                                 - DatabaseType:
                                       Fn::ImportValue: !Sub ${EnvStack}-DatabaseType
-
                             cwd: /home/ec2-user
                 Boot:
                     commands:
