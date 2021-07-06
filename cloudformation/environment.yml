@@ -727,18 +727,14 @@ Resources:
                                         "time_limit": ${DBInactiveLimit},
                                         "db_log": {
                                             "path": "db.log"
-                                        },
-                                        "output": {n
                                         }
                                     }
                                 }
-
                     commands:
                         0_SetupServerEnvironment:
                             command: !Sub |
                                 git clone https://github.com/Cozieee/sagesaver sagesaver-gh
-                                mv sagesaver-gh/${DBType}/boot/* ./sagesaver
-                                bash sagesaver-gh/${DBType}/env/setup.sh -u '${DBUsername}' -p '${DBPassword}'
+                                bash sagesaver-gh/envs/setup.sh -s '${DBType}' -u '${DBUsername}' -p '${DBPassword}'
                                 rm -rf sagesaver-gh
                             cwd: /root
                 Boot:
