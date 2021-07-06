@@ -1,49 +1,83 @@
-from datetime import datetime
-from sagesaver.server import Server
-from sagesaver.logging import *
+import os
+from datetime import datetime, strftime
+import re
+import time
 
-# def get_log_time(line):
-#     m = re.match(r'\[[A-Z] (.*)\.\d* [a-zA-Z]*\]', last_line)
-#     return datetime.strptime(m.group(1), JUPYTER_LOG_TIME_FORMAT)
+from .server import Server
+from .utils import seconds_ago
+from .logging import IdleLog
 
-# def is_active_line(line):
-#     m = re.match(r'\[([A-Z]).*](.*)', line)
 
-#     log_level = m.group(1)
-#     description = m.group(2)
+class JupyterEntry():
+    def __init__(self, line, time_format):
+        self._line = line
+        self._time_format = time_format
 
-#     return (
-#         log_level != 'D' or 
-#         description.startswith(" activity on")
-#     )
-    
+    @property
+    def time(self):
+        m = re.match(r'\[[A-Z] (.*)\.\d* [a-zA-Z]*\]', self._line)
+        return datetime.strptime(m.group(1), self._time_format)
+
+    @property
+    def is_active(self):
+        m = re.match(r'\[([A-Z]).*](.*)', self._line)
+
+        log_level = m.group(1)
+        description = m.group(2)
+
+        return (
+            log_level != 'D' or
+            description.startswith("activity on")
+        )
+
+    def __repr__(self):
+        return self._line
+
+
 class Notebook(Server):
 
-    def get_last_active(self):
+    def get_last_active_entry(self, truncate_log = False):
+        time_format = self.conf.jupyter.time_format
 
-        with open(path, 'r') as f:
-            last_active_line = None
+        with open(self.path, 'rw') as f:
+            last_active_entry = None
 
             for line in f:
                 try:
-                    if is_active_line(line):
-                        last_active_line = line
+                    entry = JupyterEntry(line, time_format)
+                    if entry.is_active:
+                        last_active_entry = entry
                 except AttributeError:
-                    pass
+                    continue
+            
+            if last_active_entry and truncate_log:
+                f.write(last_active_entry)
 
-        return last_active_line
+        return last_active_entry
 
-#     def autostop(self):
-#         log = ConditionsLog(" | ")
-        
-#         last_line = get_last_active(self.conf['jupyter']['log'])
-#         seconds_idle = seconds_ago(get_log_time(last_line))
+    def time_inactive(self, *args):
+        last_entry = self.get_last_active_entry(*args)
 
-#     print(f'[{datetime.now().strftime(OUTPUT_TIME_FORMAT)}] Last active {seconds_idle:.0f}s ago')
+        return (seconds_ago(last_entry.time) if last_entry
+                else time.clock_gettime(time.CLOCK_BOOTTIME))
 
-#     with open(JUPYTER_LOG_PATH, 'w') as f:
-#         f.write(last_line)
+    @property
+    def idle(self):
+        time_format = self.conf.jupyter.time_format
+        idle_log = IdleLog(time_format)
 
-#     if seconds_idle > INACTIVE_TIME_LIMIT:
-#         print(f'Idle Limit ({INACTIVE_TIME_LIMIT}s) exceeded. Shutting down...')
-#         os.system('sudo shutdown now -h')
+        t = self.time_inactive(truncate_log=True)
+        t_limit = self.conf.autostop.time_limit
+
+        idle_log.condition(t <= t_limit, {
+            'Name': 'Under Time Limit',
+            'Details': {
+                'Time Inactive': t,
+                'Time Limit': t_limit
+            }
+        })
+
+        print(idle_log.log)
+
+        return idle_log.idle
+

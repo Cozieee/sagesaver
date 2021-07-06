@@ -87,7 +87,6 @@ Parameters:
 Conditions:
     IsMongo: !Equals [!Ref DBType, mongo]
     IsMysql: !Equals [!Ref DBType, mysql]
-    IsDev: True
 Metadata:
     AWS::CloudFormation::Interface:
         ParameterGroups:
@@ -158,6 +157,21 @@ Mappings:
                 Content-Transfer-Encoding: 7bit
                 Content-Disposition: attachment; filename="userdata.txt"
 Resources:
+    DBSecret:
+            Type: AWS::SecretsManager::Secret
+            Properties:
+                Name: !Sub ${AWS::StackName}-Database-Secret
+                Description: !Sub ${DBType} database credentials for ${AWS::StackName} SageSaver stack
+                SecretString: !Sub
+                    - |
+                        {
+                            "username": "${DBUsername}",
+                            "password": "${DBPassword}",
+                            "port": ${DBPort},
+                            "host": "${DBHost}"
+                        }
+                    - DBPort: !FindInMap [DBMap, !Ref DBType, Port]
+                    DBHost: !GetAtt DBInstance.PrivateIp
     DBInstance:
         Type: AWS::EC2::Instance
         Properties:
@@ -204,10 +218,12 @@ Resources:
             Tags:
                 - Key: Name
                   Value: !Sub ${AWS::StackName} ${DBType}
-                - Key: sagesaver:stack-origin
+                - Key: stack-origin
                   Value: !Ref AWS::StackName
-                - Key: sagesaver:server-type
+                - Key: server-type
                   Value: Database
+                - Key: database-secret-name
+                  Value: !Ref DBSecret
         Metadata:
             AWS::CloudFormation::Init:
                 Init:
