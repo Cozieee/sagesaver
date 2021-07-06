@@ -87,6 +87,7 @@ Parameters:
 Conditions:
     IsMongo: !Equals [!Ref DBType, mongo]
     IsMysql: !Equals [!Ref DBType, mysql]
+    IsDev: True
 Metadata:
     AWS::CloudFormation::Interface:
         ParameterGroups:
