@@ -48,6 +48,12 @@ Parameters:
         AllowedPattern: ^[a-zA-Z0-9]*$
         ConstraintDescription: has invalid length or characters
         NoEcho: true
+    NBInactiveLimit:
+        Type: Number
+        Description: Minutes notebook can be inactive (no files ran/saved/edited) before shutting down
+        Default: 30
+        MinValue: 5
+        MaxValue: 1440
     Linux2AMI:
         Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
         Description: Don't edit this value
@@ -157,14 +163,14 @@ Resources:
                                     output_format = %Y-%m-%d %H:%M:%S
 
                                     [jupyter_log]
-                                    path = /home/ec2-user/jupyter.log
+                                    path = /var/sagesaver/jupyter.log
                                     time_format = %Y-%m-%d %H:%M:%S
                                 - DatabaseID:
                                       Fn::ImportValue: !Sub ${EnvStack}-DatabaseID
                     commands:
-                        0_SetupEFSDir:
+                        0_SetupDirs:
                             command: |
-                                mkdir /home/ec2-user/efs
+                                mkdir /home/ec2-user/efs /var/sagesaver
                                 chmod go+rw /home/ec2-user/efs
                         1_SetupServerEnvironment:
                             command: !Sub |
@@ -219,3 +225,4 @@ Resources:
                         - Tutorial
                     Boot:
                         - Boot
+    

@@ -1,17 +1,14 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >
-    A cheaper sagemaker-studio-like jupyter environment made for AWS new-comers.
-    Comes pre-bundled with a database (Mongo/MySQL), cost-saving measures like
-    automatic inactivity  detection (adjustable), optional shared notebook 
-    repository (EFS), and fast environment & notebook launch speeds.
+    A cheaper sagemaker-studio-like jupyter environment made for AWS new-comers
 Parameters:
     DBType:
         Type: String
         Description: Type of database to host
-        Default: Mongo
+        Default: mongo
         AllowedValues:
-            - Mongo
-            - Mysql
+            - mongo
+            - mysql
     DBInstanceType:
         Type: String
         Description:
@@ -88,8 +85,8 @@ Parameters:
         Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
         ConstraintDescription: cannot be changed
 Conditions:
-    IsMongo: !Equals [!Ref DBType, Mongo]
-    IsMysql: !Equals [!Ref DBType, Mysql]
+    IsMongo: !Equals [!Ref DBType, mongo]
+    IsMysql: !Equals [!Ref DBType, mysql]
 Metadata:
     AWS::CloudFormation::Interface:
         ParameterGroups:
@@ -123,7 +120,7 @@ Metadata:
                 default: Password
             DBKeyPair:
                 default: EC2 Key Pair
-            DBSize: 
+            DBSize:
                 default: Storage Size
             DBInactiveLimit:
                 default: Inactive Time Limit
@@ -135,9 +132,9 @@ Metadata:
                 default: EC2 Instance Base AMI
 Mappings:
     DBMap:
-        Mongo:
+        mongo:
             Port: 27017
-        Mysql:
+        mysql:
             Port: 3046
     Template:
         UserData:
@@ -160,22 +157,93 @@ Mappings:
                 Content-Transfer-Encoding: 7bit
                 Content-Disposition: attachment; filename="userdata.txt"
 Resources:
-    DBSecret:
-        Type: AWS::SecretsManager::Secret
+    DBInstance:
+        Type: AWS::EC2::Instance
         Properties:
-            Name: !Sub ${AWS::StackName}-Database-Secret
-            Description: !Sub ${DBType} database credentials for ${AWS::StackName} SageSaver stack
-            SecretString: !Sub
-                - |
-                    {
-                        "username": "${DBUsername}",
-                        "password": "${DBPassword}",
-                        "port": "${DBPort}",
-                        "host": "${DBHost}"
-                    }
-                - DBPort: !FindInMap [DBMap, !Ref DBType, Port]
-                  DBHost: localhost
-                #   DBHost: !GetAtt DatabaseInstance.PrivateIp
+            ImageId: !Ref Linux2AMI
+            KeyName: !Ref DBKeyPair
+            InstanceType: !Ref DBInstanceType
+            BlockDeviceMappings: !If
+                - IsMongo
+                - - DeviceName: /dev/sdf
+                    Ebs:
+                        VolumeType: gp3
+                        VolumeSize: !Ref DBSize
+                        DeleteOnTermination: true
+                  - DeviceName: /dev/sdg
+                    Ebs:
+                        VolumeType: gp2
+                        VolumeSize: !Ref JournalSize
+                        DeleteOnTermination: true
+                  - DeviceName: /dev/sdh
+                    Ebs:
+                        VolumeType: gp2
+                        VolumeSize: !Ref LogSize
+                        DeleteOnTermination: true
+                - !If
+                  - IsMysql
+                  - - DeviceName: /dev/sdf
+                      Ebs:
+                          VolumeType: gp3
+                          VolumeSize: !Ref DBSize
+                          DeleteOnTermination: true
+                  - AWS::NoValue
+            UserData:
+                Fn::Base64: !Sub
+                    - |
+                        ${OnBootPrefix}
+                        #!/bin/bash
+                        /opt/aws/bin/cfn-init \
+                            --region ${AWS::Region} \
+                            -s ${AWS::StackName} \
+                            -r DBInstance \
+                            -c Boot
+                        --//
+                    - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
+            Tags:
+                - Key: Name
+                  Value: !Sub ${AWS::StackName} ${DBType}
+                - Key: sagesaver:stack-origin
+                  Value: !Ref AWS::StackName
+                - Key: sagesaver:server-type
+                  Value: Database
         Metadata:
+            AWS::CloudFormation::Init:
+                Init:
+                    packages:
+                        yum:
+                            git: []
+                    files:
+                        /root/sagesaver/config.json:
+                            content: !Sub |
+                                [autostop]
+                                time_limit = ${DBInactiveLimit}
+                                output_log = autostop.log
+                    commands:
+                        0_SetupServerEnvironment:
+                            command: !Sub |
+                                git clone https://github.com/Cozieee/sagesaver sagesaver-gh
+                                bash sagesaver-gh/envs/setup.sh -s '${DBType}' -u '${DBUsername}' -p '${DBPassword}'
+                                rm -rf sagesaver-gh
+                            cwd: /root
+                Boot:
+                    commands:
+                        0_CheckInitialized:
+                            command: !Sub |
+                                /opt/aws/bin/cfn-init \
+                                    --region ${AWS::Region} \
+                                    -s ${AWS::StackName} \
+                                    -r DBInstance \
+                                    -c Init
+                            test: test ! -e sagesaver
+                            cwd: /root
+                        1_StartCron:
+                            command: bash boot.sh
+                            cwd: /root/sagesaver
+                configSets:
+                    Init:
+                        - Init
+                    Boot:
+                        - Boot
             AWS::CloudFormation::Designer:
-                id: bb502e68-dac5-4d6a-8387-058944e3fc85
+                id: 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e

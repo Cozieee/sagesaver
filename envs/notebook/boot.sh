@@ -18,7 +18,7 @@ python3 db_boot.py
 sudo -u ec2-user screen -dm bash -c "
 source ~/notebook-env/bin/activate
 cd $JPY_CWD_PATH
-jupyter lab --collaborative 2>&1 | tee -a ~/jupyter.log
+jupyter lab --collaborative 2>&1 | tee -a /var/sagesaver/jupyter.log
 exec sh
 "
 
