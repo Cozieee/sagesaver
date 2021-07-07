@@ -33,8 +33,10 @@ mysqladmin --user=root --password=$TMP_PWD password $DB_PWD
 mysql --user=root --password=$DB_PWD --execute="
 RENAME USER 'root'@'localhost' TO '$DB_USER'@'%';
 FLUSH PRIVILEGES;
+"
 
+mysql --user=$DB_USER --password=$DB_PWD --execute="
 SET GLOBAL log_output = 'FILE';
-SET GLOBAL general_log_file = 'db.log';
+SET GLOBAL general_log_file = '/var/log/sagesaver/mysql.log';
 SET GLOBAL general_log = 'ON';
 "
