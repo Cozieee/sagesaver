@@ -3,7 +3,6 @@ import os
 
 import boto3
 from cached_property import cached_property
-from configparser import ConfigParser
 import jmespath
 from pymongo import MongoClient
 from pymysql.connections import Connection
@@ -14,29 +13,22 @@ from .metadata import metadata_plus as mp
 # TODO Cloudformation read output
 # TODO Give Server templates a Database Secret Name Tag & remove sagesaver:
 
-
 class Server():
     '''
     required tags: stack-origin, server-type, database-secret-name
     '''
     region = mp.region
-    server_type = mp.tags['server-type']
 
-    def __init__(self, conf_path='/etc/sagesaver.conf'):
-        self.conf_path = conf_path
-
+    def __init__(self):
         self.session = boto3.session.Session(region_name=self.region)
-
-        self.conf = ConfigParser()
-        self.conf.read(conf_path)
-    
-    def autostop(self):
-        if self.idle:
-            os.system('sudo shutdown now -h')
 
     @property
     def idle(self):
         return False
+    
+    def autostop(self):
+        if self.idle:
+            os.system('sudo shutdown now -h')
 
     def get_secret(self, secret_name):
         client = self.session.client('secretsmanager')
@@ -82,7 +74,7 @@ class Server():
             return Connection(
                 user=secret['username'],
                 password=secret['password'],
-                port=secret['port'],
+                # port=secret['port'],
                 host=secret['host']
             )
         else:
@@ -92,20 +84,10 @@ class Server():
         pass
 
     @classmethod
-    def create(self):
-        from .notebook import Notebook
-        from .database import Mongo, Mysql
-
-        server_type = self.server_type
+    def get_server_class(self):
+        server_type = mp.tags['server-type']
 
         if server_type == 'notebook':
-            return Notebook()
+            return 'notebook'
         elif server_type == 'database':
-            db_type = self.db_type
-
-            if db_type == 'mongo':
-                return Mongo()
-            elif db_type == 'mysql':
-                return Mysql()
-
-        return None
+            return mp.tags['database-type']

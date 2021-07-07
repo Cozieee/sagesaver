@@ -1,15 +1,4 @@
-import os
 from setuptools import setup, find_packages, Command
-
-class CleanCommand(Command):
-    """Custom clean command to tidy up the project root."""
-    user_options = []
-    def initialize_options(self):
-        pass
-    def finalize_options(self):
-        pass
-    def run(self):
-        os.system('rm -vrf ./build ./dist ./*.pyc ./*.tgz ./*.egg-info')
 
 setup(
     name="sagesaver-core",
@@ -36,8 +25,11 @@ setup(
     ],
     package_dir={"": "src"},
     packages=find_packages(where="src"),
-    python_requires=">=3.6",
-    cmdclass={
-        'clean': CleanCommand,
-    }
+    include_package_data=True,
+    package_data={
+        "": [
+            "sagesaver/data/*"
+        ]
+    },
+    python_requires=">=3.6"
 )

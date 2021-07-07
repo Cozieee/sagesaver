@@ -1,11 +1,14 @@
-import os
-from datetime import datetime, strftime
+from datetime import datetime
+import logging
 import re
 import time
 
+from .logging import DateField, IdleField, composeMessage
 from .server import Server
 from .utils import seconds_ago
-from .logging import IdleLog
+
+logger = logging.getLogger(__name__)
+loggerIdle = logging.getLogger(__name__ + ".idle")
 
 
 class JupyterEntry():
@@ -36,48 +39,54 @@ class JupyterEntry():
 
 class Notebook(Server):
 
-    def get_last_active_entry(self, truncate_log = False):
-        time_format = self.conf.jupyter.time_format
+    def __init__(self, log_path, time_format):
+        self.log_path = log_path
+        self.time_format = time_format
 
-        with open(self.path, 'rw') as f:
+    def get_last_active_entry(self, truncate_log=False):
+
+        with open(self.log_path, 'r+') as f:
             last_active_entry = None
 
             for line in f:
                 try:
-                    entry = JupyterEntry(line, time_format)
+                    entry = JupyterEntry(line, self.time_format)
                     if entry.is_active:
                         last_active_entry = entry
                 except AttributeError:
                     continue
-            
+
             if last_active_entry and truncate_log:
                 f.write(last_active_entry)
 
         return last_active_entry
 
-    def time_inactive(self, *args):
-        last_entry = self.get_last_active_entry(*args)
+    def time_inactive(self, truncate_log=True):
+        last_entry = self.get_last_active_entry(truncate_log)
 
         return (seconds_ago(last_entry.time) if last_entry
                 else time.clock_gettime(time.CLOCK_BOOTTIME))
 
     @property
     def idle(self):
-        time_format = self.conf.jupyter.time_format
-        idle_log = IdleLog(time_format)
+        idle_field = IdleField("Server Idle")
 
-        t = self.time_inactive(truncate_log=True)
-        t_limit = self.conf.autostop.time_limit
+        t = int(self.time_inactive(truncate_log=True) / 60)
 
-        idle_log.condition(t <= t_limit, {
-            'Name': 'Under Time Limit',
-            'Details': {
+        idle_field.append(
+            name="Over Time Limit",
+            value=t > self.time_limit,
+            details={
                 'Time Inactive': t,
-                'Time Limit': t_limit
+                'Time Limit': self.time_limit
             }
-        })
+        )
 
-        print(idle_log.log)
+        loggerIdle.debug(
+            composeMessage("Check Notebook is Idle",[
+                DateField(),
+                idle_field
+            ])
+        )
 
-        return idle_log.idle
-
+        return idle_field.idle

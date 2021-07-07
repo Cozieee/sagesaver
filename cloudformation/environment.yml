@@ -716,20 +716,18 @@ Resources:
                         yum:
                             git: []
                     files:
-                        /root/sagesaver/config.json:
-                            content: !Sub |
-                                {
-                                    "aws": {
-                                        "region": "${AWS::Region}",
-                                        "stack": "${AWS::StackName}"
-                                    },
-                                    "autostop": {
-                                        "time_limit": ${DBInactiveLimit},
-                                        "db_log": {
-                                            "path": "db.log"
-                                        }
-                                    }
-                                }
+                        /etc/sagesaver.conf:
+                            content: !Sub
+                                - |
+                                    [autostop]
+                                    time_limit = ${DBInactiveLimit}
+                                    output_format = %Y-%m-%d %H:%M:%S
+
+                                    [mysql]
+                                    log_path = /var/log/sagesaver/mysql.log
+
+                                    [mongo]
+                                    dump_path = /var/log/sagesaver/mongo.log
                     commands:
                         0_SetupServerEnvironment:
                             command: !Sub |
@@ -845,7 +843,7 @@ Outputs:
         Description: Type of database hosted in this environment
         Value: !Ref DBType
         Export:
-            Name: !Sub ${AWS::StackName}-DatabaseType 
+            Name: !Sub ${AWS::StackName}-DatabaseType
     DBID:
         Description: ID of the environment's ec2 database
         Value: !Ref DBInstance
