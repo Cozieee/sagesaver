@@ -1,49 +1,92 @@
 from datetime import datetime
-from sagesaver.server import Server
-from sagesaver.logging import *
+import logging
+import re
+import time
 
-# def get_log_time(line):
-#     m = re.match(r'\[[A-Z] (.*)\.\d* [a-zA-Z]*\]', last_line)
-#     return datetime.strptime(m.group(1), JUPYTER_LOG_TIME_FORMAT)
+from .logging import DateField, IdleField, composeMessage
+from .server import Server
+from .utils import seconds_ago
 
-# def is_active_line(line):
-#     m = re.match(r'\[([A-Z]).*](.*)', line)
+logger = logging.getLogger(__name__)
+loggerIdle = logging.getLogger(__name__ + ".idle")
 
-#     log_level = m.group(1)
-#     description = m.group(2)
 
-#     return (
-#         log_level != 'D' or 
-#         description.startswith(" activity on")
-#     )
-    
+class JupyterEntry():
+    def __init__(self, line, time_format):
+        self._line = line
+        self._time_format = time_format
+
+    @property
+    def time(self):
+        m = re.match(r'\[[A-Z] (.*)\.\d* [a-zA-Z]*\]', self._line)
+        return datetime.strptime(m.group(1), self._time_format)
+
+    @property
+    def is_active(self):
+        m = re.match(r'\[([A-Z]).*](.*)', self._line)
+
+        log_level = m.group(1)
+        description = m.group(2)
+
+        return (
+            log_level != 'D' or
+            description.startswith("activity on")
+        )
+
+    def __repr__(self):
+        return self._line
+
+
 class Notebook(Server):
 
-    def get_last_active(self):
+    def __init__(self, log_path, time_format):
+        self.log_path = log_path
+        self.time_format = time_format
 
-        with open(path, 'r') as f:
-            last_active_line = None
+    def get_last_active_entry(self, truncate_log=False):
+
+        with open(self.log_path, 'r+') as f:
+            last_active_entry = None
 
             for line in f:
                 try:
-                    if is_active_line(line):
-                        last_active_line = line
+                    entry = JupyterEntry(line, self.time_format)
+                    if entry.is_active:
+                        last_active_entry = entry
                 except AttributeError:
-                    pass
+                    continue
 
-        return last_active_line
+            if last_active_entry and truncate_log:
+                f.write(last_active_entry)
 
-#     def autostop(self):
-#         log = ConditionsLog(" | ")
-        
-#         last_line = get_last_active(self.conf['jupyter']['log'])
-#         seconds_idle = seconds_ago(get_log_time(last_line))
+        return last_active_entry
 
-#     print(f'[{datetime.now().strftime(OUTPUT_TIME_FORMAT)}] Last active {seconds_idle:.0f}s ago')
+    def time_inactive(self, truncate_log=True):
+        last_entry = self.get_last_active_entry(truncate_log)
 
-#     with open(JUPYTER_LOG_PATH, 'w') as f:
-#         f.write(last_line)
+        return (seconds_ago(last_entry.time) if last_entry
+                else time.clock_gettime(time.CLOCK_BOOTTIME))
 
-#     if seconds_idle > INACTIVE_TIME_LIMIT:
-#         print(f'Idle Limit ({INACTIVE_TIME_LIMIT}s) exceeded. Shutting down...')
-#         os.system('sudo shutdown now -h')
+    @property
+    def idle(self):
+        idle_field = IdleField("Server Idle")
+
+        t = int(self.time_inactive(truncate_log=True) / 60)
+
+        idle_field.append(
+            name="Over Time Limit",
+            value=t > self.time_limit,
+            details={
+                'Time Inactive': t,
+                'Time Limit': self.time_limit
+            }
+        )
+
+        loggerIdle.debug(
+            composeMessage("Check Notebook is Idle",[
+                DateField(),
+                idle_field
+            ])
+        )
+
+        return idle_field.idle
