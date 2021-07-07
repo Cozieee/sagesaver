@@ -143,10 +143,10 @@ Resources:
             Tags:
                 - Key: Name
                   Value: !Ref NBName
-                - Key: sagesaver:stack-origin
+                - Key: stack-origin
                   Value: !Ref AWS::StackName
-                - Key: sagesaver:server-type
-                  Value: Notebook
+                - Key: server-type
+                  Value: notebook
         Metadata:
             AWS::CloudFormation::Init:
                 Init:
