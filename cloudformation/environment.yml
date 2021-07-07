@@ -50,11 +50,10 @@ Parameters:
     DBPassword:
         Type: String
         Description: Password used to connect to database
-        Default: dsuMLppftw21
         MinLength: 8
         MaxLength: 40
-        AllowedPattern: ^[a-zA-Z0-9]*$
-        ConstraintDescription: has invalid length or characters
+        AllowedPattern: ^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+*!=]).*$
+        ConstraintDescription: must be 8 characters with 1 lowercase, 1 uppercase, and 1 special
         NoEcho: true
     DBSize:
         Type: Number
@@ -405,7 +404,7 @@ Mappings:
         mongo:
             Port: 27017
         mysql:
-            Port: 3046
+            Port: 3306
     Template:
         UserData:
             OnBoot: |
@@ -705,31 +704,27 @@ Resources:
             Tags:
                 - Key: Name
                   Value: !Sub ${AWS::StackName} ${DBType}
-                - Key: sagesaver:stack-origin
+                - Key: stack-origin
                   Value: !Ref AWS::StackName
-                - Key: sagesaver:server-type
-                  Value: Database
+                - Key: server-type
+                  Value: database
+                - Key: database-type
+                  Value: !Ref DBType
+                - Key: database-secret-name
+                  Value: !Sub ${AWS::StackName}-Database-Secret
         Metadata:
             AWS::CloudFormation::Init:
                 Init:
                     packages:
                         yum:
                             git: []
+                            awscli: []
                     files:
                         /root/sagesaver/config.json:
                             content: !Sub |
-                                {
-                                    "aws": {
-                                        "region": "${AWS::Region}",
-                                        "stack": "${AWS::StackName}"
-                                    },
-                                    "autostop": {
-                                        "time_limit": ${DBInactiveLimit},
-                                        "db_log": {
-                                            "path": "db.log"
-                                        }
-                                    }
-                                }
+                                [autostop]
+                                time_limit = ${DBInactiveLimit}
+                                output_log = autostop.log
                     commands:
                         0_SetupServerEnvironment:
                             command: !Sub |
@@ -748,9 +743,9 @@ Resources:
                                     -c Init
                             test: test ! -e sagesaver
                             cwd: /root
-                        1_StartCron:
-                            command: bash boot.sh
-                            cwd: /root/sagesaver
+                        # 1_StartCron:
+                        #     command: bash boot.sh
+                        #     cwd: /root/sagesaver
                 configSets:
                     Init:
                         - Init
@@ -784,8 +779,23 @@ Resources:
                 Version: 2012-10-17
                 Statement:
                     - Effect: Allow
-                      Action: ec2:DescribeInstances
+                      Action: 
+                        - ec2:DescribeInstances
+                        - ec2:DescribeTags
                       Resource: "*"
+            Roles:
+                - !Ref DBRole
+                - !Ref NBRole
+    DescribeStackOrigin:
+        Type: AWS::IAM::Policy
+        Properties:
+            PolicyName: !Sub ${AWS::StackName}-DescribeInstances
+            PolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                    - Effect: Allow
+                      Action: cloudformation:DescribeStacks
+                      Resource: !Ref AWS::StackId
             Roles:
                 - !Ref DBRole
                 - !Ref NBRole
@@ -845,7 +855,7 @@ Outputs:
         Description: Type of database hosted in this environment
         Value: !Ref DBType
         Export:
-            Name: !Sub ${AWS::StackName}-DatabaseType 
+            Name: !Sub ${AWS::StackName}-DatabaseType
     DBID:
         Description: ID of the environment's ec2 database
         Value: !Ref DBInstance
