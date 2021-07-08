@@ -721,17 +721,16 @@ Resources:
                             awscli: []
                     files:
                         /etc/sagesaver.conf:
-                            content: !Sub
-                                - |
-                                    [autostop]
-                                    time_limit = ${DBInactiveLimit}
-                                    output_format = %Y-%m-%d %H:%M:%S
+                            content: !Sub |
+                                [autostop]
+                                time_limit = ${DBInactiveLimit}
+                                output_format = %Y-%m-%d %H:%M:%S
 
-                                    [mysql]
-                                    log_path = /var/log/sagesaver/mysql.log
+                                [mysql]
+                                log_path = /var/log/sagesaver/mysql.log
 
-                                    [mongo]
-                                    dump_path = /var/log/sagesaver/mongo.log
+                                [mongo]
+                                dump_path = /var/log/sagesaver/mongo.log
                     commands:
                         0_SetupServerEnvironment:
                             command: !Sub |
@@ -786,9 +785,9 @@ Resources:
                 Version: 2012-10-17
                 Statement:
                     - Effect: Allow
-                      Action: 
-                        - ec2:DescribeInstances
-                        - ec2:DescribeTags
+                      Action:
+                          - ec2:DescribeInstances
+                          - ec2:DescribeTags
                       Resource: "*"
             Roles:
                 - !Ref DBRole
