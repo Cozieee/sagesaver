@@ -10,8 +10,8 @@
   <img src="https://github.com/Cozieee/sagesaver/blob/master/assets/launch_environment.png" width=220 height=40 align="right"/>
 </a>
 <p>
-  🏠 &nbsp Configure a secure SageSaver environment to house your project notebooks & labratories <br/>
-  📂 &nbsp Optionally attach a pre-configured MySQL or Mongo database!
+  🏠 &nbsp Configure a secure SageSaver environment to house your project notebooks <br/>
+  📂 &nbsp Optionally attach a centralized MySQL or Mongo database!
 </p>
 
 ### 2 - Notebooks
