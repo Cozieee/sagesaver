@@ -1,5 +1,7 @@
 # SageSaver
 
+## Quick Start
+
 ### 1 - Environment
 
 <a href="https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/quickcreate?
@@ -8,7 +10,8 @@
   <img src="https://github.com/Cozieee/sagesaver/blob/master/assets/launch_environment.png" width=220 height=40 align="right"/>
 </a>
 <p>
-  Launch a SageSaver data science environment with a central database server
+  🏠 &nbsp Configure a secure SageSaver environment to house your project notebooks & labratories <br/>
+  📂 &nbsp Optionally attach a pre-configured MySQL or Mongo database!
 </p>
 
 ### 2 - Notebooks
@@ -19,5 +22,5 @@
   <img src="https://github.com/Cozieee/sagesaver/blob/master/assets/launch_notebook.png" width=206 height=40 align="right"/>
 </a>
 <p>
-  Launch a SageSaver data science environment with a central database server
+  🚀 &nbsp Launch as many additional notebooks & labratories you need in your environment!
 </p>
