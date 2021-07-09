@@ -728,31 +728,39 @@ Resources:
                         yum:
                             git: []
                             awscli: []
+                            jq: []
                     files:
                         /etc/sagesaver.conf:
                             content: !Sub |
-                                [autostop]
-                                time_limit = ${DBInactiveLimit}
-                                output_format = %Y-%m-%d %H:%M:%S
-
-                                [mysql]
-                                log_path = /var/log/sagesaver/mysql.log
-
-                                [mongo]
-                                dump_path = /var/log/sagesaver/mongo.log
+                                {
+                                    "autostop": {
+                                        "time_limit": ${DBInactiveLimit},
+                                        "output_format": "%Y-%m-%d %H:%M:%S"
+                                    },
+                                    "mysql": {
+                                        "log_path": "/var/log/sagesaver/mysql.log"
+                                    },
+                                    "mongo": {
+                                        "log_path": "/var/log/sagesaver/mongo.dump"
+                                    }
+                                }
                     commands:
-                        0_SetupServerEnvironment:
-                            command: !Sub |
-                                git clone https://github.com/Cozieee/sagesaver sagesaver-gh
-                                bash sagesaver-gh/envs/setup.sh -s '${DBType}' -u '${DBUsername}' -p '${DBPassword}'
-                                rm -rf sagesaver-gh
+                        0_CreateFolders:
+                            command: |
+                                mkdir /var/log/sagesaver
+                        1_SetupServerEnvironment:
+                            command: !Sub
+                                - |
+                                    git clone https://github.com/Cozieee/sagesaver sagesaver-gh
+                                    bash sagesaver-gh/envs/setup.sh -s '${DBType}' -u '${DBUsername}' -p '${DBPassword}' ${DevFlag}
+                                    rm -rf sagesaver-gh
+                                - DevFlag: !If [IsDev, "-d", ""]
                             test: test ! -e sagesaver
                             cwd: /root
                 Activate:
                     commands:
                         0_StartCron:
-                            command: bash boot.sh
-                            cwd: /root/sagesaver
+                            command: !Sub sagesaver ${DBType} activate
                 configSets:
                     Init:
                         - Init

@@ -17,6 +17,10 @@ do
         shift
         shift
         ;;
+        -d|--dev)
+        DEV=true
+        shift
+        ;;
     esac
 done
 

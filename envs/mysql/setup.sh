@@ -17,8 +17,20 @@ do
         shift
         shift
         ;;
+        -d|--dev)
+        DEV=true
+        shift
+        ;;
     esac
 done
+
+LOG_PATH=$(jq -r '.mysql.log_path' < /etc/sagesaver.conf)
+
+# Premptively create mysql log and set public permissons before mysql does
+if [ "$DEV" = true ] ; then
+    touch $LOG_PATH
+    chmod 777 $LOG_PATH
+fi
 
 rpm -Uvh https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm 
 yum install -y mysql-community-server
@@ -37,6 +49,6 @@ FLUSH PRIVILEGES;
 
 mysql --user=$DB_USER --password=$DB_PWD --execute="
 SET GLOBAL log_output = 'FILE';
-SET GLOBAL general_log_file = '/var/log/sagesaver/mysql.log';
+SET GLOBAL general_log_file = '$LOG_PATH';
 SET GLOBAL general_log = 'ON';
 "
