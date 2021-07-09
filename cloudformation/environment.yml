@@ -84,9 +84,15 @@ Parameters:
         Description: Image used for instances
         Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
         ConstraintDescription: cannot be changed
+    DevKey:
+        Type: String
+        Description: Should be empty, unless you're a dev
+        Default: ""
 Conditions:
     IsMongo: !Equals [!Ref DBType, mongo]
     IsMysql: !Equals [!Ref DBType, mysql]
+    IsDev: !Equals [!Ref DevKey, sagesaverFTW789]
+    IsProd: !Not [!Equals [!Ref DevKey, sagesaverFTW789]]
 Metadata:
     AWS::CloudFormation::Interface:
         ParameterGroups:
@@ -109,6 +115,7 @@ Metadata:
                   default: Enforced Configurations [DO NOT CHANGE]
               Parameters:
                   - Linux2AMI
+                  - DevKey
         ParameterLabels:
             DBType:
                 default: DMS Type
@@ -130,6 +137,8 @@ Metadata:
                 default: Log Size
             Linux2AMI:
                 default: EC2 Instance Base AMI
+            DevKey:
+                default: Developer Key
     AWS::CloudFormation::Designer:
         5ef05761-700a-446a-b034-123395f54960:
             size:
@@ -737,26 +746,21 @@ Resources:
                                 git clone https://github.com/Cozieee/sagesaver sagesaver-gh
                                 bash sagesaver-gh/envs/setup.sh -s '${DBType}' -u '${DBUsername}' -p '${DBPassword}'
                                 rm -rf sagesaver-gh
-                            cwd: /root
-                Boot:
-                    commands:
-                        0_CheckInitialized:
-                            command: !Sub |
-                                /opt/aws/bin/cfn-init \
-                                    --region ${AWS::Region} \
-                                    -s ${AWS::StackName} \
-                                    -r DBInstance \
-                                    -c Init
                             test: test ! -e sagesaver
                             cwd: /root
-                        # 1_StartCron:
-                        #     command: bash boot.sh
-                        #     cwd: /root/sagesaver
+                Activate:
+                    commands:
+                        0_StartCron:
+                            command: bash boot.sh
+                            cwd: /root/sagesaver
                 configSets:
                     Init:
                         - Init
-                    Boot:
-                        - Boot
+                    Boot: !If
+                        - IsProd
+                        - - Init
+                          - Activate
+                        - - Init
             AWS::CloudFormation::Designer:
                 id: 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e
     DBSecret:
@@ -795,7 +799,7 @@ Resources:
     DescribeStackOrigin:
         Type: AWS::IAM::Policy
         Properties:
-            PolicyName: !Sub ${AWS::StackName}-DescribeInstances
+            PolicyName: !Sub ${AWS::StackName}-DescribeStackOrigin
             PolicyDocument:
                 Version: 2012-10-17
                 Statement:
@@ -805,6 +809,7 @@ Resources:
             Roles:
                 - !Ref DBRole
                 - !Ref NBRole
+    # TODO Notebook template should determine whether to attach this for the notebook role
     AccessDBSecretPolicy:
         Type: AWS::IAM::Policy
         Properties:
