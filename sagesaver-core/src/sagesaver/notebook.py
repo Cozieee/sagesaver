@@ -71,7 +71,7 @@ class Notebook(Server):
     def idle(self):
         idle_field = IdleField("Server Idle")
 
-        t = int(self.time_inactive(truncate_log=True) / 60)
+        t = self.time_inactive(truncate_log=True)
 
         idle_field.append(
             name="Over Time Limit",

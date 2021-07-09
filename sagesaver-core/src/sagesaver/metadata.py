@@ -27,5 +27,4 @@ class MetadataPlus(EC2Metadata):
 
         return tags
 
-
 metadata_plus = MetadataPlus()

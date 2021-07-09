@@ -7,6 +7,7 @@ import jmespath
 import json
 from json.decoder import JSONDecodeError
 
+from .environment import environment as env
 from .server import Server
 from .metadata import metadata_plus as mp
 from .utils import seconds_ago
@@ -18,7 +19,8 @@ loggerIdle = logging.getLogger(__name__ + ".idle")
 
 class Database(Server, ABC):
 
-    def __init__(self, time_limit):
+    def __init__(self, type, time_limit):
+        self.type = type
         self.time_limit = time_limit
         super().__init__()
 
@@ -59,8 +61,7 @@ class Database(Server, ABC):
     def idle(self):
         idle_field = IdleField("Server Idle")
 
-        t = int(self.time_inactive(idle_field) / 60)
-
+        t = self.time_inactive(idle_field)
         if idle_field.idle:
             t_limit = self.time_limit
 
@@ -85,7 +86,7 @@ class Database(Server, ABC):
             )
 
         loggerIdle.debug(
-            composeMessage(f"Check {self.db_type.capitalize()} DB Idle", [
+            composeMessage(f"Check {self.type.capitalize()} DB Idle", [
                 DateField(),
                 idle_field
             ])
@@ -98,7 +99,7 @@ class Mongo(Database):
 
     def __init__(self, dump_path, time_limit):
         self.dump_path = dump_path
-        super().__init__(time_limit)
+        super().__init__("mongo", time_limit)
 
     def time_inactive(self, idle_field=None):
         client = self.db_client()
@@ -139,7 +140,7 @@ class Mysql(Database):
 
     def __init__(self, log_path, time_limit):
         self.log_path = log_path
-        super().__init__(time_limit)
+        super().__init__("mysql", time_limit)
 
     def get_last_active_entry(self):
         with open(self.log_path, 'r') as log_file:
@@ -168,6 +169,6 @@ class Mysql(Database):
                 last_entry.split()[0], '%Y-%m-%dT%H:%M:%S.%fZ')
             return seconds_ago(entry_date)
         else:
-            self.general_logger.warning(
+            logger.warning(
                 f"{__name__} > Found no log entries in mysql.log")
             return time.clock_gettime(time.CLOCK_BOOTTIME)
