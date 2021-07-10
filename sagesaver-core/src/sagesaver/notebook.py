@@ -5,7 +5,6 @@ import time
 
 from .logging import DateField, IdleField, composeMessage
 from .server import Server
-from .utils import seconds_ago
 
 logger = logging.getLogger(__name__)
 loggerIdle = logging.getLogger(__name__ + ".idle")
@@ -64,8 +63,13 @@ class Notebook(Server):
     def time_inactive(self, truncate_log=True):
         last_entry = self.get_last_active_entry(truncate_log)
 
-        return (seconds_ago(last_entry.time) if last_entry
-                else time.clock_gettime(time.CLOCK_BOOTTIME))
+        seconds_ago = time.clock_gettime(time.CLOCK_BOOTTIME)
+
+        if last_entry:
+            last_active = last_entry.time
+            seconds_ago = (datetime.now() - last_active).total_seconds()
+
+        return seconds_ago
 
     @property
     def idle(self):

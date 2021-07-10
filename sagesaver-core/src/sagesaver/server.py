@@ -61,12 +61,3 @@ class Server():
             )
         else:
             return None
-
-    @classmethod
-    def get_server_class(self):
-        server_type = mp.tags['server-type']
-
-        if server_type == 'notebook':
-            return 'notebook'
-        elif server_type == 'database':
-            return mp.tags['database-type']

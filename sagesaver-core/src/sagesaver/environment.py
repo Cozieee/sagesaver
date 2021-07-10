@@ -17,8 +17,7 @@ class Environment():
         stack = jmespath.search('Stacks[0]', response)
 
         return stack
-
-    @cached_property
+    
     def output(self, key):
         return jmespath.search(f"Outputs[?OutputKey=='{key}'] | [0].OutputValue", self.stack)
 

@@ -71,7 +71,7 @@ service mongod start
 
 mongo <<EOF
 use admin
-db.createUser({ user: "${DB_USER}", pwd: "${MONGO_PWD}", roles: ["root"] })
+db.createUser({ user: "${DB_USER}", pwd: "${DB_PWD}", roles: ["root"] })
 EOF
 
 AUTHORIZATION=enabled
