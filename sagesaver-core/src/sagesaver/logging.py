@@ -1,5 +1,5 @@
 from datetime import datetime
-
+import json
 
 def composeMessage(topic=None, fields=[], stringify=True, details={}):
     message_fields = []
@@ -14,7 +14,7 @@ def composeMessage(topic=None, fields=[], stringify=True, details={}):
     message_dict = dict(message_fields)
     message_dict.update(details)
 
-    return str(message_dict) if stringify else message_dict
+    return json.dumps(message_dict) if stringify else message_dict
 
 
 class Field():
