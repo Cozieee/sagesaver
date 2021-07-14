@@ -92,7 +92,6 @@ Conditions:
     IsMongo: !Equals [!Ref DBType, mongo]
     IsMysql: !Equals [!Ref DBType, mysql]
     IsDev: !Equals [!Ref DevKey, sagesaverFTW789]
-    IsProd: !Not [!Equals [!Ref DevKey, sagesaverFTW789]]
 Metadata:
     AWS::CloudFormation::Interface:
         ParameterGroups:
@@ -710,7 +709,7 @@ Resources:
                             -c ${ConfigSet}
                         --//
                     - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
-                      ConfigSet: !If [IsProd, Prod, Dev]
+                      ConfigSet: !If [IsDev, Dev, Prod]
             Tags:
                 - Key: Name
                   Value: !Sub ${AWS::StackName} ${DBType}
@@ -738,11 +737,16 @@ Resources:
                                         "time_limit": ${DBInactiveLimit},
                                         "output_format": "%Y-%m-%d %H:%M:%S"
                                     },
+                                    "aws": {
+                                        "server_type": "database",
+                                        "database_type": "${DBType}",
+                                        "stack_origin": "${AWS::StackName}"
+                                    },
                                     "mysql": {
                                         "log_path": "/var/log/sagesaver/mysql.log"
                                     },
                                     "mongo": {
-                                        "log_path": "/var/log/sagesaver/mongo.dump"
+                                        "dump_path": "/var/log/sagesaver/mongo.dump"
                                     }
                                 }
                     commands:
@@ -773,6 +777,8 @@ Resources:
                         0_StartCron:
                             command: !Sub sagesaver ${DBType} activate
                 configSets:
+                    Init:
+                        - Init
                     Dev:
                         - CheckedInit
                     Prod:
