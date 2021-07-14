@@ -20,7 +20,10 @@ class SupportedDBMS(Enum):
     def __init__(self, proper_name):
         self.proper_name = proper_name
 
-    def __repr__(self) -> str:
+    def __repr__(self):
+        return self.proper_name
+    
+    def __str__(self):
         return self.proper_name
 
 
@@ -28,21 +31,19 @@ class Database(Server, ABC):
 
     def __init__(
         self,
-        dbms_type,
         database_secret_name,
         stack_origin,
-        session,
-        time_limit=1800
+        dbms_type,
+        **kwargs
     ):
         if not isinstance(dbms_type, SupportedDBMS):
             raise TypeError(f'Provided dbms type is not supported')
 
-        self.dbms_type = dbms_type
         self.database_secret_name = database_secret_name
         self.stack_origin = stack_origin
-        self.time_limit = time_limit
+        self.dbms_type = dbms_type
 
-        super(Server, self).__init__(session)
+        super().__init__(**kwargs)
 
     @abstractmethod
     def last_active(self):
