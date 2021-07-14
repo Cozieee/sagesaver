@@ -3,7 +3,7 @@ import logging
 import re
 import time
 
-from .logging import DateField, IdleField, composeMessage
+from .fields import DateField, IdleField, composeMessage
 from .server import Server
 
 logger = logging.getLogger(__name__)

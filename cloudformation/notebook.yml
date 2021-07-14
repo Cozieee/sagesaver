@@ -42,11 +42,10 @@ Parameters:
     NBPassword:
         Type: String
         Description: Password used to login to Jupyter Notebook
-        Default: Qw3rty11
         MinLength: 8
         MaxLength: 40
-        AllowedPattern: ^[a-zA-Z0-9]*$
-        ConstraintDescription: has invalid length or characters
+        AllowedPattern: ^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+*!=]).*$
+        ConstraintDescription: must be 8 characters with 1 lowercase, 1 uppercase, and 1 special
         NoEcho: true
     NBInactiveLimit:
         Type: Number
@@ -144,9 +143,10 @@ Resources:
                             --region ${AWS::Region} \
                             -s ${AWS::StackName} \
                             -r NBInstance \
-                            -c Boot
+                            -c ${ConfigSet}
                         --//
                     - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
+                      ConfigSet: !If [IsProd, Prod, Dev]
             Tags:
                 - Key: Name
                   Value: !Ref NBName
@@ -185,9 +185,26 @@ Resources:
                                 bash sagesaver-gh/envs/setup.sh -s 'notebook' -p '${NBPassword}'
                                 rm -rf sagesaver-gh
                             cwd: /root
-                Tutorial:
+                CheckedInit:
+                    commands: 
+                        0_Init:
+                            command: !Sub |
+                                /opt/aws/bin/cfn-init \
+                                    --region ${AWS::Region} \
+                                    -s ${AWS::StackName} \
+                                    -r NBInstance \
+                                    -c Init
+                            test: test ! -e /etc/sagesaver.conf
+                            cwd: /root
+                LoadEFS:
                     command:
-                        0_LoadTutorial:
+                        0_MountEFS:
+                            command:
+                                Fn::Sub:
+                                    - mount -t efs ${EFSID} /home/ec2-user/efs
+                                    - EFSID:
+                                          Fn::ImportValue: !Sub ${EnvStack}-EFSID
+                        1_LoadTutorial:
                             command: !Sub
                                 - |
                                     git clone https://github.com/Cozieee/sagesaver sagesaver-gh
@@ -195,42 +212,19 @@ Resources:
                                     rm -rf sagesaver-gh
                                 - DatabaseType:
                                       Fn::ImportValue: !Sub ${EnvStack}-DatabaseType
-                            cwd: /home/ec2-user
-                Boot:
-                    commands:
-                        0_CheckInitialized:
-                            command: !Sub |
-                                /opt/aws/bin/cfn-init \
-                                    --region ${AWS::Region} \
-                                    -s ${AWS::StackName} \
-                                    -r NBInstance \
-                                    -c Init
-                            test: test ! -e sagesaver
-                            cwd: /root
-                        1_MountEFS:
-                            command:
-                                Fn::Sub:
-                                    - mount -t efs ${EFSID} /home/ec2-user/efs
-                                    - EFSID:
-                                          Fn::ImportValue: !Sub ${EnvStack}-EFSID
-                        2_CheckEFSNotEmpty:
-                            command: !Sub |
-                                /opt/aws/bin/cfn-init \
-                                    --region ${AWS::Region} \
-                                    -s ${AWS::StackName} \
-                                    -r NBInstance \
-                                    -c Tutorial
                             test: test -z "$(ls -A efs)"
                             cwd: /home/ec2-user
-                        3_StartCron:
-                            condition: IsProd
-                            command: bash boot.sh -j /home/ec2-user/efs
+                Activate:
+                    commands:
+                        2_StartCron:
+                            command: sagesaver notebook activate
                             cwd: /root/sagesaver
                 configSets:
-                    Init:
-                        - Init
-                    Tutorial:
-                        - Tutorial
-                    Boot:
-                        - Boot
+                    Dev:
+                        - CheckedInit
+                        - LoadEFS
+                    Prod:
+                        - CheckedInit
+                        - LoadEFS
+                        - Activate
     

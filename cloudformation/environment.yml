@@ -707,9 +707,10 @@ Resources:
                             --region ${AWS::Region} \
                             -s ${AWS::StackName} \
                             -r DBInstance \
-                            -c Boot
+                            -c ${ConfigSet}
                         --//
                     - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
+                      ConfigSet: !If [IsProd, Prod, Dev]
             Tags:
                 - Key: Name
                   Value: !Sub ${AWS::StackName} ${DBType}
@@ -757,18 +758,26 @@ Resources:
                                 - DevFlag: !If [IsDev, "-d", ""]
                             test: test ! -e sagesaver
                             cwd: /root
+                CheckedInit:
+                    commands:
+                        0_Init:
+                            command: !Sub |
+                                /opt/aws/bin/cfn-init \
+                                    --region ${AWS::Region} \
+                                    -s ${AWS::StackName} \
+                                    -r DBInstance \
+                                    -c Init
+                            test: test ! -e /etc/sagesaver.conf
                 Activate:
                     commands:
                         0_StartCron:
                             command: !Sub sagesaver ${DBType} activate
                 configSets:
-                    Init:
-                        - Init
-                    Boot: !If
-                        - IsProd
-                        - - Init
-                          - Activate
-                        - - Init
+                    Dev:
+                        - CheckedInit
+                    Prod:
+                        - CheckedInit
+                        - Activate
             AWS::CloudFormation::Designer:
                 id: 73f4494b-b0c8-4f50-8bab-c604d1ec2a8e
     DBSecret:
