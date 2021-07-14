@@ -8,8 +8,15 @@ do
         shift
         shift
         ;;
+        -d|--dev)
+        DEV=true
     esac
 done
+
+if [ "$DEV" = true ] ; then
+    cat /home/ec2-user/.ssh/authorized_keys > /root/.ssh/authorized_keys
+    /sbin/service sshd restart
+fi
 
 python3 -m pip install $DIR/../sagesaver-core --user
 

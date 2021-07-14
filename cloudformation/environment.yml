@@ -752,17 +752,11 @@ Resources:
                                     bash sagesaver-gh/envs/setup.sh -s '${DBType}' -u '${DBUsername}' -p '${DBPassword}' ${DevFlag}
                                     rm -rf sagesaver-gh
                                 - DevFlag: !If [IsDev, "-d", ""]
-                            test: test ! -e sagesaver
                             cwd: /root
                 CheckedInit:
                     commands:
                         0_Init:
-                            command: !Sub |
-                                /opt/aws/bin/cfn-init \
-                                    --region ${AWS::Region} \
-                                    -s ${AWS::StackName} \
-                                    -r DBInstance \
-                                    -c Init
+                            command: /opt/aws/bin/cfn-init -v /var/lib/cfn-init/data/metadata.json -c Init
                             test: test ! -e /etc/sagesaver.conf
                 Activate:
                     commands:
@@ -771,6 +765,7 @@ Resources:
                 configSets:
                     Init:
                         - Init
+
                     Dev:
                         - CheckedInit
                     Prod:
