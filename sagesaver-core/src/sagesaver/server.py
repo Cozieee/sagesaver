@@ -11,8 +11,9 @@ class Server():
     required tags: stack-origin, database-secret-name
     '''
 
-    def init(self, session):
+    def __init__(self, session, time_limit):
         self.session = session
+        self.time_limit = time_limit
 
     @property
     def idle(self):

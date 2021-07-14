@@ -19,9 +19,13 @@ def _is_user_collection(s):
 
 class Mongo(Database):
 
-    def __init__(self, dump_path, *args, **kwargs):
+    def __init__(
+        self,
+        dump_path,
+        **kwargs
+    ):
         self.dump_path = dump_path
-        super().__init__(*args, **kwargs, dmbs_type = SupportedDBMS.MONGO)
+        super().__init__(dbms_type = SupportedDBMS.MONGO, **kwargs)
 
     def client(self, **kwargs):
         secret = self.get_secret(self.database_secret_name)
