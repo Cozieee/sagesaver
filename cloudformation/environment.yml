@@ -713,14 +713,6 @@ Resources:
             Tags:
                 - Key: Name
                   Value: !Sub ${AWS::StackName} ${DBType}
-                - Key: stack-origin
-                  Value: !Ref AWS::StackName
-                - Key: server-type
-                  Value: database
-                - Key: database-type
-                  Value: !Ref DBType
-                - Key: database-secret-name
-                  Value: !Sub ${AWS::StackName}-Database-Secret
         Metadata:
             AWS::CloudFormation::Init:
                 Init:
