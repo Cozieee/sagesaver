@@ -117,7 +117,6 @@ Mappings:
                 Content-Disposition: attachment; filename="userdata.txt"
 Conditions:
     IsDev: !Equals [!Ref DevKey, sagesaverFTW789]
-    IsProd: !Not [!Equals [!Ref DevKey, sagesaverFTW789]]
 Resources:
     NBInstance:
         Type: AWS::EC2::Instance
@@ -146,7 +145,7 @@ Resources:
                             -c ${ConfigSet}
                         --//
                     - OnBootPrefix: !FindInMap [Template, UserData, OnBoot]
-                      ConfigSet: !If [IsProd, Prod, Dev]
+                      ConfigSet: !If [IsDev, Dev, Prod]
             Tags:
                 - Key: Name
                   Value: !Ref NBName
@@ -180,20 +179,17 @@ Resources:
                                 mkdir /home/ec2-user/efs /var/sagesaver
                                 chmod go+rw /home/ec2-user/efs
                         1_SetupServerEnvironment:
-                            command: !Sub |
-                                git clone https://github.com/Cozieee/sagesaver sagesaver-gh
-                                bash sagesaver-gh/envs/setup.sh -s 'notebook' -p '${NBPassword}'
-                                rm -rf sagesaver-gh
+                            command: !Sub 
+                                - |
+                                    git clone https://github.com/Cozieee/sagesaver sagesaver-gh
+                                    bash sagesaver-gh/envs/setup.sh -s 'notebook' -p '${NBPassword}' ${DevFlag}
+                                    rm -rf sagesaver-gh
+                                - DevFlag: !If [IsDev, "-d", ""]
                             cwd: /root
                 CheckedInit:
                     commands: 
                         0_Init:
-                            command: !Sub |
-                                /opt/aws/bin/cfn-init \
-                                    --region ${AWS::Region} \
-                                    -s ${AWS::StackName} \
-                                    -r NBInstance \
-                                    -c Init
+                            command: /opt/aws/bin/cfn-init -v /var/lib/cfn-init/data/metadata.json -c Init
                             test: test ! -e /etc/sagesaver.conf
                             cwd: /root
                 LoadEFS:
