@@ -725,14 +725,16 @@ Resources:
                         /etc/sagesaver.conf:
                             content: !Sub |
                                 {
-                                    "autostop": {
-                                        "time_limit": ${DBInactiveLimit},
-                                        "output_format": "%Y-%m-%d %H:%M:%S"
+                                    "env": {
+                                        "name": "${AWS::StackName}"
                                     },
-                                    "aws": {
-                                        "server_type": "database",
-                                        "database_type": "${DBType}",
-                                        "stack_origin": "${AWS::StackName}"
+                                    "server": {
+                                        "type": "database",
+                                        "time_limit": "${DBInactiveLimit}",
+                                        "log_time_format": "%Y-%m-%d %H:%M:%S"
+                                    },
+                                    "database":{
+                                        "type": "${DBType}"
                                     },
                                     "mysql": {
                                         "log_path": "/var/log/sagesaver/mysql.log"
