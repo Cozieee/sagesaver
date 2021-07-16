@@ -14,6 +14,10 @@ do
     esac
 done
 
+mkdir \
+$(jq -r '.sagesaver.log_dir' < /etc/sagesaver.conf) \
+$(jq -r '.sagesaver.tmp_dir' < /etc/sagesaver.conf) \
+
 if [ "$DEV" = true ] ; then
     cat /home/ec2-user/.ssh/authorized_keys > /root/.ssh/authorized_keys
     /sbin/service sshd restart

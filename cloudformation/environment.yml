@@ -725,22 +725,26 @@ Resources:
                         /etc/sagesaver.conf:
                             content: !Sub |
                                 {
-                                    "env": {
-                                        "name": "${AWS::StackName}"
+                                    "sagesaver": {
+                                        "log_dir": "/var/log/sagesaver",
+                                        "tmp_dir": "/var/tmp/sagesaver"
+                                    },
+                                    "environment": {
+                                        "stack_name": "${AWS::StackName}",
                                     },
                                     "server": {
                                         "type": "database",
-                                        "time_limit": "${DBInactiveLimit}",
-                                        "log_time_format": "%Y-%m-%d %H:%M:%S"
+                                        "log_time_format": "%Y-%m-%d %H:%M:%S",
+                                        "idle_time_limit": "${DBInactiveLimit}"
                                     },
                                     "database":{
                                         "type": "${DBType}"
                                     },
                                     "mysql": {
-                                        "log_path": "/var/log/sagesaver/mysql.log"
+                                        "log_path": "mysql.log"
                                     },
                                     "mongo": {
-                                        "dump_path": "/var/log/sagesaver/mongo.dump"
+                                        "dump_path": "mongo.dump"
                                     }
                                 }
                     commands:

@@ -149,10 +149,6 @@ Resources:
             Tags:
                 - Key: Name
                   Value: !Ref NBName
-                - Key: stack-origin
-                  Value: !Ref AWS::StackName
-                - Key: server-type
-                  Value: notebook
         Metadata:
             AWS::CloudFormation::Init:
                 Init:
@@ -160,17 +156,29 @@ Resources:
                         yum:
                             git: []
                             amazon-efs-utils: []
+                            jq: []
                     files:
                         /etc/sagesaver.conf:
                             content: !Sub
                                 - |
-                                    [autostop]
-                                    time_limit = 1800
-                                    output_format = %Y-%m-%d %H:%M:%S
-
-                                    [jupyter_log]
-                                    path = /var/sagesaver/jupyter.log
-                                    time_format = %Y-%m-%d %H:%M:%S
+                                    {
+                                        "sagesaver": {
+                                            "log_dir": "/var/log/sagesaver",
+                                            "tmp_dir": "/var/tmp/sagesaver"
+                                        },
+                                        "environment": {
+                                            "stack_name": "${EnvStack}"
+                                        },
+                                        "server": {
+                                            "type": "notebook",
+                                            "log_time_format": "%Y-%m-%d %H:%M:%S"
+                                            "idle_time_limit": 1800
+                                        },
+                                        "jupyter": {
+                                            "config_time_format": "%Y-%m-%d %H:%M:%S"
+                                            "log_path": /var/log/sagesaver/jupyter.log
+                                        }
+                                    }
                                 - DatabaseID:
                                       Fn::ImportValue: !Sub ${EnvStack}-DatabaseID
                     commands:
@@ -216,6 +224,8 @@ Resources:
                             command: sagesaver notebook activate
                             cwd: /root/sagesaver
                 configSets:
+                    Init:
+                        - Init
                     Dev:
                         - CheckedInit
                         - LoadEFS
