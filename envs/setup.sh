@@ -10,6 +10,7 @@ do
         ;;
         -d|--dev)
         DEV=true
+        ;;
     esac
 done
 
