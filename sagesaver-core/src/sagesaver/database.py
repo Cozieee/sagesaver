@@ -32,7 +32,6 @@ class Database(Server, ABC):
     def __init__(
         self,
         database_secret_name,
-        stack_origin,
         dbms_type,
         **kwargs
     ):
@@ -40,7 +39,6 @@ class Database(Server, ABC):
             raise TypeError(f'Provided dbms type is not supported')
 
         self.database_secret_name = database_secret_name
-        self.stack_origin = stack_origin
         self.dbms_type = dbms_type
 
         super().__init__(**kwargs)
@@ -59,7 +57,7 @@ class Database(Server, ABC):
         filters = [
             {
                 "Name": "tag:stack-origin",
-                "Values": [self.stack_origin]
+                "Values": [self.env_stack]
             },
             {
                 "Name": "tag:server-type",
