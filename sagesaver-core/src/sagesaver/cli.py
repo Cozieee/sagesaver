@@ -2,6 +2,22 @@ from ec2_metadata import ec2_metadata as md
 import boto3
 import json
 import logging
+import pkg_resources
+
+
+def read_conf():
+    s = pkg_resources.resource_stream(
+        __name__, 'data/default-conf.json').read().decode()
+    default_conf = json.loads(s)
+
+    try:
+        f = open('/etc/sagesaver-conf.json','r')
+    except FileNotFoundError:
+        return default_conf
+
+    override_conf = json.load(f)
+
+    return {**default_conf, **override_conf}
 
 server_kw = {}
 
@@ -11,37 +27,66 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 logger.addHandler(ch)
 
-with open('/etc/sagesaver.conf') as conf_file:
-    conf = json.load(conf_file)
 
-    server_type = conf['aws']['server_type']
+def get_interface(conf):
 
-    server_kw.update({
-        'session': boto3.Session(region_name=md.region),
-        'time_limit': conf['autostop']['time_limit'] * 60
-    })
+    interface_kw = {}
 
-    if server_type == 'database':
-        
-        database_type = conf['aws']['database_type']
+    interface_type = conf['interface']['type']
 
-        server_kw.update({
-            'stack_origin': conf['aws']['stack_origin'],
-            'database_secret_name': f"{conf['aws']['stack_origin']}-Database-Secret"
+    if interface_type == 'user':
+
+        from sagesaver import User
+        return User(**interface_kw)
+
+    elif interface_type == 'server':
+
+        interface_kw.update({
+            'env_stack': conf['server']['env_stack_name'],
+            'session': boto3.Session(region_name=md.region),
+            'time_limit': conf['server']['idle_time_limit'] * 60
         })
 
-        if database_type == 'mongo':
-            server_kw.update({
-                'dump_path': conf['mongo']['dump_path']
+        server_type = conf['server']['type']
+
+        if server_type == 'database':
+
+            interface_kw.update({
+                'stack_origin': conf['database']['st'],
+                'database_secret_name': f"{conf['aws']['stack_origin']}-Database-Secret"
             })
 
-            from sagesaver import Mongo
-            server = Mongo(**server_kw)
+            database_type = conf['database']['type']
 
+            if database_type == 'mongo':
 
-        elif database_type == 'mysql':
-            from sagesaver import Mysql
-            server = Mysql(**server_kw)
+                interface_kw.update({
+                    'dump_path': conf['mongo']['dump_path']
+                })
 
-    elif server_type == 'notebook':
-        pass
+                from sagesaver import Mongo
+                return Mongo(**interface_kw)
+
+            elif database_type == 'mysql':
+
+                from sagesaver import Mysql
+                return Mysql(**interface_kw)
+
+            else:
+                return ValueError('Database Type is (mongo|mysql)')
+
+        elif server_type == 'notebook':
+
+            interface_kw.update({
+                'jupyter_log_path': conf['jupyter']['log_path'],
+                'jupyter_time_format': conf['jupyter']['config_time_format']
+            })
+            
+            from sagesaver import Notebook
+            return Notebook(**interface_kw)
+
+        else:
+            return ValueError('Server Type is (database|notebook)')
+
+    else:
+        return ValueError('Interface Type is (server|user)')

@@ -38,18 +38,20 @@ class JupyterEntry():
 
 class Notebook(Server):
 
-    def __init__(self, log_path, time_format):
-        self.log_path = log_path
-        self.time_format = time_format
+    def __init__(self, jupyter_log_path, jupyter_time_format, **kwargs):
+        self.jupyter_log_path = jupyter_log_path
+        self.jupyter_time_format = jupyter_time_format
+        
+        super().__init__(**kwargs)
 
     def get_last_active_entry(self, truncate_log=False):
 
-        with open(self.log_path, 'r+') as f:
+        with open(self.jupyter_log_path, 'r+') as f:
             last_active_entry = None
 
             for line in f:
                 try:
-                    entry = JupyterEntry(line, self.time_format)
+                    entry = JupyterEntry(line, self.jupyter_time_format)
                     if entry.is_active:
                         last_active_entry = entry
                 except AttributeError:
