@@ -61,9 +61,9 @@ Parameters:
         Default: 20
         MinValue: 1
         ConstraintDescription: must be at least 1 GB
-    DBInactiveLimit:
+    DBIdleLimit:
         Type: Number
-        Description: Minutes database can be inactive (no queries) before shutting down
+        Description: Minutes database can be inactive (no queries) before shutting down server
         Default: 30
         MinValue: 5
         MaxValue: 1440
@@ -104,7 +104,7 @@ Metadata:
                   - DBUsername
                   - DBPassword
                   - DBSize
-                  - DBInactiveLimit
+                  - DBIdleLimit
             - Label:
                   default: MongoDB [IF SELECTED]
               Parameters:
@@ -128,8 +128,8 @@ Metadata:
                 default: EC2 Key Pair
             DBSize:
                 default: Storage Size
-            DBInactiveLimit:
-                default: Inactive Time Limit
+            DBIdleLimit:
+                default: Server Idle Limit
             JournalSize:
                 default: Journal Size
             LogSize:
@@ -713,6 +713,12 @@ Resources:
             Tags:
                 - Key: Name
                   Value: !Sub ${AWS::StackName} ${DBType}
+                - Key: env-stack-name
+                  Value: !Ref AWS::StackName
+                - Key: server-type
+                  Value: database
+                - Key: database-type
+                  Value: !Ref DBType
         Metadata:
             AWS::CloudFormation::Init:
                 Init:
@@ -722,29 +728,19 @@ Resources:
                             awscli: []
                             jq: []
                     files:
-                        /etc/sagesaver.conf:
+                        /etc/sagesaver-conf.json:
                             content: !Sub |
                                 {
-                                    "sagesaver": {
-                                        "log_dir": "/var/log/sagesaver",
-                                        "tmp_dir": "/var/tmp/sagesaver"
-                                    },
-                                    "environment": {
-                                        "stack_name": "${AWS::StackName}",
+                                    "interface": {
+                                        "type": "server"
                                     },
                                     "server": {
                                         "type": "database",
-                                        "log_time_format": "%Y-%m-%d %H:%M:%S",
-                                        "idle_time_limit": "${DBInactiveLimit}"
+                                        "env_stack_name": "${AWS::StackName}",
+                                        "idle_time_limit": ${DBIdleLimit}
                                     },
                                     "database":{
                                         "type": "${DBType}"
-                                    },
-                                    "mysql": {
-                                        "log_path": "mysql.log"
-                                    },
-                                    "mongo": {
-                                        "dump_path": "mongo.dump"
                                     }
                                 }
                     commands:

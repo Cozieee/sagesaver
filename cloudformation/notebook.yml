@@ -47,9 +47,9 @@ Parameters:
         AllowedPattern: ^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+*!=]).*$
         ConstraintDescription: must be 8 characters with 1 lowercase, 1 uppercase, and 1 special
         NoEcho: true
-    NBInactiveLimit:
+    NBIdleLimit:
         Type: Number
-        Description: Minutes notebook can be inactive (no files ran/saved/edited) before shutting down
+        Description: Minutes Jupyter can be idle (no notebooks ran/saved/edited) before shutting down server
         Default: 30
         MinValue: 5
         MaxValue: 1440
@@ -77,6 +77,7 @@ Metadata:
                   - NBInstanceType
                   - NBKeyPair
                   - NBPassword
+                  - NBIdleLimit
             - Label:
                   default: Enforced Configurations [DO NOT CHANGE]
               Parameters:
@@ -92,6 +93,8 @@ Metadata:
                 default: Notebook Name
             NBPassword:
                 default: Jupyter Password
+            NBIdleLimit:
+                default: Server Idle Limit
             Linux2AMI:
                 default: EC2 Instance Base AMI
 Mappings:
@@ -149,6 +152,10 @@ Resources:
             Tags:
                 - Key: Name
                   Value: !Ref NBName
+                - Key: stack-origin
+                  Value: !Ref AWS::StackName
+                - Key: server-type
+                  Value: notebook
         Metadata:
             AWS::CloudFormation::Init:
                 Init:
@@ -162,21 +169,13 @@ Resources:
                             content: !Sub
                                 - |
                                     {
-                                        "sagesaver": {
-                                            "log_dir": "/var/log/sagesaver",
-                                            "tmp_dir": "/var/tmp/sagesaver"
-                                        },
-                                        "environment": {
-                                            "stack_name": "${EnvStack}"
+                                        "interface": {
+                                            "type": "server"
                                         },
                                         "server": {
                                             "type": "notebook",
-                                            "log_time_format": "%Y-%m-%d %H:%M:%S"
-                                            "idle_time_limit": 1800
-                                        },
-                                        "jupyter": {
-                                            "config_time_format": "%Y-%m-%d %H:%M:%S"
-                                            "log_path": /var/log/sagesaver/jupyter.log
+                                            "env_stack_name": "${EnvStack}",
+                                            "idle_time_limit": ${NBIdleLimit}
                                         }
                                     }
                                 - DatabaseID:
