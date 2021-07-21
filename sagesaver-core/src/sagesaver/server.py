@@ -1,19 +1,22 @@
 import json
 import os
 
+from .interface import Interface
+
 # TODO Describe Tags Permission
 # TODO Cloudformation read output
 # TODO Give Server templates a Database Secret Name Tag & remove sagesaver:
 
 
-class Server():
+class Server(Interface):
     '''
     required tags: stack-origin, database-secret-name
     '''
 
-    def __init__(self, session, time_limit):
-        self.session = session
+    def __init__(self, time_limit, env_stack, **kwargs):
         self.time_limit = time_limit
+        self.env_stack = env_stack
+        super().__init__(**kwargs)
 
     @property
     def idle(self):
