@@ -13,10 +13,10 @@ class Mysql(Database):
 
     def __init__(self, log_path, *args, **kwargs):
         self.log_path = log_path
-        super().__init__(*args, **kwargs, dbms_type=SupportedDatabases.MYSQL)
+        super().__init__(*args, **kwargs, database_type=SupportedDatabases.MYSQL)
 
     def connection(self, **kwargs):
-        secret = self.get_secret(self.database_secret_name)
+        secret = self.get_secret(self.secret_name)
 
         return Connection(
             user=secret['username'],

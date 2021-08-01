@@ -31,15 +31,15 @@ class Database(Server, ABC):
 
     def __init__(
         self,
-        database_secret_name,
-        dbms_type,
+        secret_name,
+        database_type,
         **kwargs
     ):
-        if not isinstance(dbms_type, SupportedDatabases):
+        if not isinstance(database_type, SupportedDatabases):
             raise TypeError(f'Provided dbms type is not supported')
 
-        self.database_secret_name = database_secret_name
-        self.dbms_type = dbms_type
+        self.secret_name = secret_name
+        self.database_type = database_type
 
         super().__init__(**kwargs)
 
@@ -109,7 +109,7 @@ class Database(Server, ABC):
             )
 
         loggerIdle.debug(
-            composeMessage(f"Checking {self.dbms_type} Server idle", [
+            composeMessage(f"Checking {self.database_type} Server idle", [
                 DateField(),
                 idle_field
             ])

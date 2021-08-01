@@ -13,9 +13,8 @@ class Server(Interface):
     required tags: stack-origin, database-secret-name
     '''
 
-    def __init__(self, time_limit, env_stack, **kwargs):
+    def __init__(self, time_limit, **kwargs):
         self.time_limit = time_limit
-        self.env_stack = env_stack
         super().__init__(**kwargs)
 
     @property

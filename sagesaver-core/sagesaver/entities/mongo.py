@@ -25,10 +25,10 @@ class Mongo(Database):
         **kwargs
     ):
         self.dump_path = dump_path
-        super().__init__(dbms_type = SupportedDatabases.MONGO, **kwargs)
+        super().__init__(database_type = SupportedDatabases.MONGO, **kwargs)
 
     def client(self, **kwargs):
-        secret = self.get_secret(self.database_secret_name)
+        secret = self.get_secret(self.secret_name)
 
         return MongoClient(
             username=secret['username'],
