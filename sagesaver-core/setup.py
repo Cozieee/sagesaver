@@ -13,11 +13,10 @@ setup(
     },
     install_requires=[
         'boto3',
+        'click',
         'pymongo',
         'pymysql',
-        'jmespath',
-        'cached_property',
-        'ec2_metadata'
+        'jmespath'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -27,6 +26,12 @@ setup(
 
     include_package_data=True,
     packages=find_packages(where=""),
+
+    entry_points={
+        'console_scripts': [
+            'sagesaver = sagesaver.cli.entrypoint:main',
+        ],
+    },
     
     python_requires=">=3.6"
 )
