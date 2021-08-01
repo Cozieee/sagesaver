@@ -1,7 +1,3 @@
-from copy import deepcopy
-from enum import Enum
-import json
-
 from sagesaver.exceptions import (
     ConfigurationForbiddenError,
     InstallationFailedError,
@@ -12,26 +8,36 @@ from .entitytypes import EntityTypes
 
 class EntityConfiguration():
 
-    def __init__(self, new_type, stack_name, region):
+    reconfigurable_types = [
+        EntityTypes.USER,
+        EntityTypes.SEED
+    ]
+
+    def __init__(self, entity_type: str, stack_name: str, region: str):
+
+        entity_type = entity_type.upper()
 
         self.manager = ConfigManager()
 
-        if type not in EntityTypes:
+        try:
+            self.entity_type = EntityTypes[entity_type]
+        except KeyError:
             raise ConfigurationForbiddenError(
-                type, f'{new_type} is not a supported Entity Type'
+                entity_type = entity_type, 
+                reason = 'not a supported Entity Type'
             )
-
-        self.entity_type = EntityTypes[new_type]
-
+        
         current_type = self.manager.config['environmental']['type']
+        current_type = EntityTypes[current_type]
 
-        if current_type not in ['USER', None]:
+        if current_type not in self.reconfigurable_types:
             raise ConfigurationForbiddenError(
-                type, f'{current_type} does not support reconfiguration'
+                entity_type = entity_type, 
+                reason = f'{current_type} type (current) does not support reconfiguration'
             )
 
         self.installation = self.entity_type.installation
-        self.installed = self.installation is not None
+        self.installed = self.installation is None
 
         self.stack_name = stack_name
         self.region = region
@@ -40,19 +46,21 @@ class EntityConfiguration():
         try:
             self.installation(*args, **kwargs)
         except:
-            raise InstallationFailedError(self.entity_type)
+            raise InstallationFailedError(
+                entity_type = self.entity_type
+            )
         
         self.installed = True
 
-    def configure_environmentals(self):
+    def save_environmentals(self):
         if not self.installed:
             raise InstallationRequiredError(
                 entity_type = self.entity_type, 
-                action='configuring cli environmental vars'
+                action='saving cli environmental vars'
             )
         
-        self.manager.config.update('environmental', {
-            'type': self.entity_type,
+        self.manager.update('environmental', {
+            'type': self.entity_type.name,
             'stack_name': self.stack_name,
             'region': self.region
         })

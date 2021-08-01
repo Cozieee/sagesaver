@@ -2,7 +2,7 @@ class SageSaverError(Exception):
     
     def __init__(self, **kwargs):
         msg = self.fmt.format(**kwargs)
-        super().__init__(self, msg)
+        super().__init__(msg)
 
 class UnconfiguredError(SageSaverError):
 
@@ -10,7 +10,7 @@ class UnconfiguredError(SageSaverError):
 
 class ConfigurationForbiddenError(SageSaverError):
 
-    fmt = 'Cannot configure type {entity_type}: {reason}'
+    fmt = 'Cannot configure type {entity_type} ({reason})'
 
 class InstallationFailedError(SageSaverError):
 
