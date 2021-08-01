@@ -1,6 +1,6 @@
 import boto3
 
-class Environment():
+class Environmental():
 
     def __init__(self, stack_name, region):
         self.stack_name = stack_name

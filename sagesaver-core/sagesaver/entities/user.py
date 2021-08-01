@@ -1,4 +1,4 @@
-from .interface import Interface
+from .environmental import Environmental
 
-class User(Interface):
+class User(Environmental):
     pass
