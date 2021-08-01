@@ -1,6 +1,6 @@
 import boto3
 
-from .. import mysql, mongo, notebook, user
+from . import mysql, mongo, notebook, user
 
 class EnvironmentFactory():
 

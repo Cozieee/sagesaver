@@ -1,14 +1,14 @@
 import json
 import os
 
-from .interface import Interface
+from .environmental import Environmental
 
 # TODO Describe Tags Permission
 # TODO Cloudformation read output
 # TODO Give Server templates a Database Secret Name Tag & remove sagesaver:
 
 
-class Server(Interface):
+class Server(Environmental):
     '''
     required tags: stack-origin, database-secret-name
     '''

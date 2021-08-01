@@ -3,7 +3,7 @@ import logging
 import re
 import time
 
-from .fields import DateField, IdleField, composeMessage
+from sagesaver.logging.fields import DateField, IdleField, composeMessage
 from .server import Server
 
 logger = logging.getLogger(__name__)
