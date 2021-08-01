@@ -1,9 +1,9 @@
 {
     "custom_conf": null,
     "environmental": {
-        "type": null,
-        "stack_name": null,
-        "region": null
+        "type": "USER",
+        "stack_name": "Mongo2",
+        "region": "us-west-2"
     },
     "server": {
         "idle_time_limit": 30,
@@ -13,7 +13,7 @@
         "log_dir": "/var/log/sagesaver",
         "tmp_dir": "/var/tmp/sagesaver"
     },
-    "database":{
+    "database": {
         "secret_name": null
     },
     "jupyter": {
