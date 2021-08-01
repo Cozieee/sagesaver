@@ -6,7 +6,7 @@ import os
 
 from pymongo import MongoClient
 
-from .database import Database, SupportedDBMS
+from .database import Database, SupportedDatabases
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class Mongo(Database):
         **kwargs
     ):
         self.dump_path = dump_path
-        super().__init__(dbms_type = SupportedDBMS.MONGO, **kwargs)
+        super().__init__(dbms_type = SupportedDatabases.MONGO, **kwargs)
 
     def client(self, **kwargs):
         secret = self.get_secret(self.database_secret_name)

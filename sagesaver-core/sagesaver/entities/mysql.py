@@ -4,7 +4,7 @@ import logging
 
 from pymysql import Connection
 
-from .database import Database, SupportedDBMS
+from .database import Database, SupportedDatabases
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class Mysql(Database):
 
     def __init__(self, log_path, *args, **kwargs):
         self.log_path = log_path
-        super().__init__(*args, **kwargs, dbms_type=SupportedDBMS.MYSQL)
+        super().__init__(*args, **kwargs, dbms_type=SupportedDatabases.MYSQL)
 
     def connection(self, **kwargs):
         secret = self.get_secret(self.database_secret_name)

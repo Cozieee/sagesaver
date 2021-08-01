@@ -1,19 +1,20 @@
 {
-    "sagesaver": {
-        "log_dir": "/var/log/sagesaver",
-        "tmp_dir": "/var/tmp/sagesaver"
-    },
-    "interface": {
-        "type": "user"
+    "custom_conf": null,
+    "environmental": {
+        "type": null,
+        "stack_name": null,
+        "region": null
     },
     "server": {
-        "type": null,
-        "env_stack_name": null,
         "idle_time_limit": 30,
         "log_time_format": "%Y-%m-%d %H:%M:%S"
     },
+    "linux": {
+        "log_dir": "/var/log/sagesaver",
+        "tmp_dir": "/var/tmp/sagesaver"
+    },
     "database":{
-        "type": null
+        "secret_name": null
     },
     "jupyter": {
         "config_time_format": "%Y-%m-%d %H:%M:%S",

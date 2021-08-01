@@ -7,13 +7,13 @@ import time
 import jmespath
 
 from .server import Server
-from .fields import DateField, IdleField, composeMessage
+from ..logging.fields import DateField, IdleField, composeMessage
 
 logger = logging.getLogger(__name__)
 loggerIdle = logging.getLogger(__name__ + ".idle")
 
 
-class SupportedDBMS(Enum):
+class SupportedDatabases(Enum):
     MONGO = ('MongoDB')
     MYSQL = ('MySQL')
 
@@ -35,7 +35,7 @@ class Database(Server, ABC):
         dbms_type,
         **kwargs
     ):
-        if not isinstance(dbms_type, SupportedDBMS):
+        if not isinstance(dbms_type, SupportedDatabases):
             raise TypeError(f'Provided dbms type is not supported')
 
         self.database_secret_name = database_secret_name
