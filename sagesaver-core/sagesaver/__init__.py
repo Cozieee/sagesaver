@@ -1,9 +1,7 @@
 import logging
+from pathlib import Path
 
-from .notebook import Notebook
-from .mongo import Mongo
-from .mysql import Mysql
-from .user import User
+PACKAGEDIR = Path(__file__).parent.absolute()
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
