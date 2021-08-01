@@ -8,6 +8,14 @@ class UnconfiguredError(SageSaverError):
 
     fmt = 'CLI environmental variables have not been configured'
 
-class ReconfigureForbiddenError(SageSaverError):
+class ConfigurationForbiddenError(SageSaverError):
 
-    fmt = 'Cannot reconfigure {old_type} into {new_type}'
+    fmt = 'Cannot configure type {entity_type}: {reason}'
+
+class InstallationFailedError(SageSaverError):
+
+    fmt = 'Installation of {entity_type} entity failed'
+
+class InstallationRequiredError(SageSaverError):
+
+    fmt = 'Installation of {entity_type} is required before {action}'
