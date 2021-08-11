@@ -1,5 +1,4 @@
-import os
-from setuptools import setup, find_packages, Command
+from setuptools import setup, find_packages
 
 setup(
     name="sagesaver-core",
@@ -15,7 +14,6 @@ setup(
         'boto3',
         'click',
         'pymongo',
-        'pymysql',
         'jmespath'
     ],
     classifiers=[
