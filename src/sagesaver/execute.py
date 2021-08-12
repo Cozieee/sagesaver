@@ -1,7 +1,7 @@
-from functools import wraps
 import subprocess
 import sys
 import os
+from pathlib import Path
 import pwd
 
 def subprocess_profile(username):
@@ -20,39 +20,39 @@ def subprocess_profile(username):
         }
     }
 
+def single_line(out: bytes, *_):
+    return out.decode().strip()
 
-def command(user = None):
-    def wrapper_factory(command_factory):
-        @wraps(command_factory)
-        def wrapper(*args, username: str = user, consumer = None, **kwargs):
-            command_arr = command_factory(*args, **kwargs)
+class Execution:
 
-            profile = (
-                subprocess_profile(username) if username
-                else {}
-            )
+    def __init__(self, username=None):
+        self._username = username
+    
+    def switch(self, username):
+        self._username = username
 
-            p = subprocess.Popen(
-                ' '.join(command_arr),
-                shell=True,
-                stdout=subprocess.PIPE if consumer else None,
-                **profile
-            )
+    def bash(self, command, consumer = None):
+        profile = (
+            subprocess_profile(self._username) if self._username
+            else {}
+        )
 
-            result = p.communicate()
-            return consumer(result) if consumer else None
-        
-        return wrapper
-    return wrapper_factory
+        p = subprocess.Popen(
+            ' '.join(command),
+            shell=True,
+            stdout=subprocess.PIPE if consumer else None,
+            **profile
+        )
 
-@command()
-def bash(args: list):
-    return args
+        result = p.communicate()
+        return consumer(result) if consumer else None
 
-@command()
-def pip_install(packages: list):
-    return [sys.executable, "-m", "pip", "install", "--user", "--no-cache-dir"] + packages
+    def pip_install(self, packages: list):
+        return self.bash([sys.executable, "-m", "pip", "install", "--user", "--no-cache-dir"] + packages)
 
-@command()
-def python3(script: list):
-    return [sys.executable, "-c", f"'{';'.join(script)}'"]
+    def python3(self, script: list):
+        return self.bash([sys.executable, "-c", f"'{';'.join(script)}'"])
+
+    def home_path(self):
+        return Path(self.bash(
+            ['echo', '$HOME'], consumer=single_line))

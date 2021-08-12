@@ -13,8 +13,10 @@ setup(
     install_requires=[
         'boto3',
         'click',
+        'jinja2',
+        'jmespath',
         'pymongo',
-        'jmespath'
+        'pymysql',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
