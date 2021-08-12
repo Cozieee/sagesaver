@@ -1,6 +1,7 @@
 from pathlib import Path
 import shutil
 from jinja2 import Environment, PackageLoader, StrictUndefined
+import pymongo
 from pymongo.mongo_client import MongoClient
 import pymysql
 from .execute import Execution, single_line
@@ -117,26 +118,32 @@ class XFSVolume:
             f.write(' '.join[self.partition_path, dir,
                              'xfs defaults,auto,noatime,noexec 0 0'])
 
+def create_admin_user(admin, username, password):
+    admin.add_user(username, password, roles=["root"])
+
+def newlines(l):
+    return list(map(lambda s: '\n' + s, l))
+
 class MongoInstallation:
 
     service = 'mongod'
 
     def __init__(
         self,
-        data_dest: Path = Path('/data'),
-        log_dest: Path = Path('/log')
+        data_dest: Path = Path('/var/lib/mongo'),
+        log_dest: Path = Path('/var/log/mongodb/mongod.log'),
+        port = 27017
     ):
         self.data_dest = data_dest
         self.log_dest = log_dest
+        self.port = port
 
-    def initialize_mongo(self, username, password):
+    def initialize_mongo(self):
+
         template_env.get_template(
             "mongodb-org-4.4.repo.jinja"
         ).stream().dump("/etc/yum.repos.d/mongodb-org-4.4.repo")
-
-        root.bash(['yum', '-y', 'install', 'mongdb-org'])
-
-        # admin.add_user(username, password, roles=roles)
+        root.bash(['yum', '-y', 'install', 'mongodb-org'])
 
     def mount_volumes(self, volumes):
         service_dests = []
@@ -158,32 +165,51 @@ class MongoInstallation:
 
     def optimize_conf(self):
         with open('/etc/security/limits.conf', 'a') as f:
-            f.writelines([
+            f.writelines(newlines([
                 "* soft nofile 64000",
                 "* hard nofile 64000",
                 "* soft nproc 32000",
                 "* hard nproc 32000",
-            ])
+            ]))
 
         with open('/etc/security/limits.d/90-nproc.conf', 'a') as f:
-            f.writelines([
+            f.writelines(newlines([
                 "* soft nproc 32000",
                 "* hard nproc 32000",
-            ])
+            ]))
 
         template_env.get_template(
             'disable-transparent-hugepages.jinja'
-        ).stream().dump('/etc/init.d')
+        ).stream().dump('/etc/init.d/disable-transparent-hugepages')
 
         template_env.get_template(
-            'log-rotate.jinja'
-        ).stream().dump('/etc/init.d')
+            'logrotate.d-mongodb.jinja'
+        ).stream().dump('/etc/logrotate.d/mongodb')
+
+    def override_mongo_conf(self):
+        template_env.get_template(
+            "mongod.conf.jinja"
+        ).stream(
+            log_path = self.log_dest,
+            data_path = self.data_dest,
+            port = self.port
+        ).dump("/etc/mongod.conf")
 
     def __call__(self, username, password, volumes=None):
         if volumes:
             self.mount_volumes(volumes)
 
-        self.initialize_mongo(username, password)
-        self.optimize_conf()
+        self.initialize_mongo()
 
-        root.bash(['service', self.service, 'restart'])
+        service_str = f'{self.service}.service'
+        root.bash([
+            f'systemctl enable {service_str};',
+            f'systemctl start {service_str}'
+        ])
+
+        create_admin_user(pymongo.MongoClient().admin, username, password)
+
+        self.optimize_conf()
+        self.override_mongo_conf()
+
+        root.bash(['sytemctl', 'restart', {service_str}])
