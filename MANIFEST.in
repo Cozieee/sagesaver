@@ -1,1 +1,1 @@
-include sagesaver/data
+include src/sagesaver/data/* src/sagesaver/templates/*
