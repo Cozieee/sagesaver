@@ -138,7 +138,7 @@ class MongoInstallation:
         self.log_dest = log_dest
         self.port = port
 
-    def initialize_mongo(self):
+    def download_mongo(self):
 
         template_env.get_template(
             "mongodb-org-4.4.repo.jinja"
@@ -199,7 +199,7 @@ class MongoInstallation:
         if volumes:
             self.mount_volumes(volumes)
 
-        self.initialize_mongo()
+        self.download_mongo()
 
         service_str = f'{self.service}.service'
         root.bash([
@@ -212,4 +212,4 @@ class MongoInstallation:
         self.optimize_conf()
         self.override_mongo_conf()
 
-        root.bash(['sytemctl', 'restart', {service_str}])
+        root.bash(['sytemctl', 'restart', service_str])
